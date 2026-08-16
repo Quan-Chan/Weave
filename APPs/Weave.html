@@ -204,7 +204,6 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 .modal-overlay.on{display:flex}
 #modal{z-index:300}
 #cpModal{z-index:400}
-#aboutModal{z-index:350}
 #settingsModal{z-index:350}
 .modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;width:340px;box-shadow:var(--shadow-lg);transform:scale(1.25);transform-origin:center center}
 .modal-box h3{font-size:14px;font-weight:600;margin-bottom:14px}
@@ -364,7 +363,6 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
       <button class="sidebar-btn" id="sidebarReadOnlyBtn" data-i18n-title="btn.readonly" title="只读模式"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
       <div class="sidebar-bottom">
         <button class="sidebar-btn" id="btnShowSettings" data-i18n-title="btn.settings" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
-        <button class="sidebar-btn" id="btnShowAbout" data-i18n-title="btn.about" title="软件详情"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>
       </div>
     </div>
   </div>
@@ -434,22 +432,6 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
   </div>
 </div>
 
-<div id="aboutModal" class="modal-overlay">
-  <div id="aboutModalBox" class="modal-box">
-    <h3 data-i18n="about.title">关于 Weave</h3>
-    <div class="about-content">
-      <div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
-      <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-      <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.0</span></div>
-      <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><span class="muted" data-i18n="about.projectUrlValue">暂无</span></div>
-      <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
-    </div>
-    <div id="aboutBtns" class="modal-btns">
-      <button id="btnCloseAbout" data-i18n="about.close">关闭</button>
-    </div>
-  </div>
-</div>
-
 <div id="settingsModal" class="modal-overlay">
   <div id="settingsModalBox" class="modal-box settings-box">
     <h3 data-i18n="set.title">设置</h3>
@@ -457,6 +439,7 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
       <div class="settings-nav">
         <button class="settings-nav-item active" data-settings-tab="general" data-i18n="set.generalTitle">常规</button>
         <button class="settings-nav-item" data-settings-tab="keys" data-i18n="set.keysTitle">键位设置</button>
+        <button class="settings-nav-item" data-settings-tab="about" data-i18n="set.aboutTitle">软件详情</button>
       </div>
       <div class="settings-panels">
         <div class="settings-panel" data-settings-panel="general">
@@ -507,6 +490,15 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
             <div class="key-row"><span class="key-desc" data-i18n="set.chrome">隐藏 / 显示界面</span><input class="help-key" type="text" data-kb="chrome" value="Ctrl+H" readonly></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.delKey">删除选中</span><input class="help-key" type="text" data-kb="delete" value="Delete" readonly></div>
             <div class="set-reset"><button class="btn btn-secondary" id="btnResetKeybinds" data-i18n="set.resetKeys">重置键位</button></div>
+          </div>
+        </div>
+        <div class="settings-panel" data-settings-panel="about" style="display:none">
+          <div class="about-content">
+            <div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
+            <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.0</span></div>
+            <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
+            <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
         </div>
       </div>
@@ -644,7 +636,7 @@ const I18N = {
     'btn.fit': '适应', 'btn.undo': '撤销', 'btn.redo': '重做',
     'btn.undoTitle': '撤销 (Ctrl+Z)', 'btn.redoTitle': '重做 (Ctrl+Y)',
     'btn.clearTitle': '清除所有节点',
-    'btn.exportPng': '导出PNG', 'btn.readonly': '只读模式', 'btn.settings': '设置', 'btn.about': '软件详情',
+    'btn.exportPng': '导出PNG', 'btn.readonly': '只读模式', 'btn.settings': '设置',
     'btn.colorGen': '选择生成节点颜色', 'btn.colorWheel': '自选颜色', 'btn.color': '颜色',
     // 右键菜单
     'ctx.edit': '编辑', 'ctx.dup': '复制', 'ctx.mirror': '镜像节点', 'ctx.props': '属性',
@@ -654,9 +646,8 @@ const I18N = {
     'modal.editTitle': '编辑节点', 'modal.label': '标签', 'modal.desc': '描述', 'modal.color': '颜色',
     'modal.cancel': '取消', 'modal.save': '保存', 'modal.customColor': '自选颜色', 'modal.confirm': '确认',
     // 关于 / 快速入门
-    'about.title': '关于 Weave', 'about.appName': '软件名称', 'about.version': '版本号',
-    'about.projectUrl': '项目地址', 'about.projectUrlValue': '暂无', 'about.devHome': '开发者主页',
-    'about.close': '关闭',
+    'about.appName': '软件名称', 'about.version': '版本号',
+    'about.projectUrl': '项目地址', 'about.devHome': '开发者主页',
     // 设置
     'set.title': '设置', 'set.snapNodes': '对齐节点', 'set.snapNodesDesc': '节点位置对齐到网格；关闭后自由摆放',
     'set.snapSize': '节点大小对齐', 'set.snapSizeDesc': '节点大小对齐到网格；关闭后自由调整',
@@ -664,6 +655,7 @@ const I18N = {
     // 设置 · 键位设置
     'set.generalTitle': '常规',
     'set.keysTitle': '键位信息',
+    'set.aboutTitle': '软件详情',
     'set.mouseTitle': '鼠标操作', 'set.keyTitle': '键盘快捷键',
     'set.kv.dblclick': '双击空白处', 'set.kv.dragNode': '左键拖拽',
     'set.kv.socket': '拖拽节点连接点', 'set.kv.dblTitle': '双击标题',
@@ -711,16 +703,15 @@ const I18N = {
     'btn.fit': 'Fit', 'btn.undo': 'Undo', 'btn.redo': 'Redo',
     'btn.undoTitle': 'Undo (Ctrl+Z)', 'btn.redoTitle': 'Redo (Ctrl+Y)',
     'btn.clearTitle': 'Clear all nodes',
-    'btn.exportPng': 'Export PNG', 'btn.readonly': 'Read-only', 'btn.settings': 'Settings', 'btn.about': 'About',
+    'btn.exportPng': 'Export PNG', 'btn.readonly': 'Read-only', 'btn.settings': 'Settings',
     'btn.colorGen': 'Color for new nodes', 'btn.colorWheel': 'Custom color', 'btn.color': 'Color',
     'ctx.edit': 'Edit', 'ctx.dup': 'Duplicate', 'ctx.mirror': 'Mirror node', 'ctx.props': 'Properties',
     'ctx.resize': 'Resize node', 'ctx.curve': 'Adjust curve', 'ctx.resetCurve': 'Reset control points',
     'ctx.resetSize': 'Reset size', 'ctx.del': 'Delete',
     'modal.editTitle': 'Edit node', 'modal.label': 'Label', 'modal.desc': 'Description', 'modal.color': 'Color',
     'modal.cancel': 'Cancel', 'modal.save': 'Save', 'modal.customColor': 'Custom color', 'modal.confirm': 'OK',
-    'about.title': 'About Weave', 'about.appName': 'Name', 'about.version': 'Version',
-    'about.projectUrl': 'Project', 'about.projectUrlValue': 'N/A', 'about.devHome': 'Developer',
-    'about.close': 'Close',
+    'about.appName': 'Name', 'about.version': 'Version',
+    'about.projectUrl': 'Project', 'about.devHome': 'Developer',
     'set.title': 'Settings', 'set.snapNodes': 'Snap nodes',
     'set.snapNodesDesc': 'Snap node positions to the grid; off for free placement',
     'set.snapSize': 'Snap size', 'set.snapSizeDesc': 'Snap node sizes to the grid; off for free resizing',
@@ -728,6 +719,7 @@ const I18N = {
     // 设置 · 键位设置
     'set.generalTitle': 'General',
     'set.keysTitle': 'Keybindings',
+    'set.aboutTitle': 'About',
     'set.mouseTitle': 'Mouse', 'set.keyTitle': 'Keyboard shortcuts',
     'set.kv.dblclick': 'Double-click', 'set.kv.dragNode': 'Left-drag',
     'set.kv.socket': 'Drag a node connection point', 'set.kv.dblTitle': 'Double-click title',
@@ -4013,7 +4005,6 @@ Object.assign(App, {
     this.cancelCustomPicker();
     document.getElementById('modal').classList.remove('on');
     this._modalNodeId = null;
-    this.closeAbout();
   },
   saveModal() {
     if (this.readOnly) { this.closeModal(); return; }
@@ -4457,12 +4448,6 @@ Object.assign(App, {
     this.showToast(this.t(this.readOnly ? 'toast.readonlyOn' : 'toast.readonlyOff'));
   },
 
-  showAbout() {
-    document.getElementById('aboutModal').classList.add('on');
-  },
-  closeAbout() {
-    document.getElementById('aboutModal').classList.remove('on');
-  },
   showSettings() {
     document.getElementById('settingsModal').classList.add('on');
   },
@@ -5289,7 +5274,6 @@ document.addEventListener('click', () => { document.getElementById('ctx').style.
 
 //弹窗事件
 document.getElementById('cpModal').addEventListener('click', function(e) { if (e.target === this) App.cancelCustomPicker(); });
-document.getElementById('aboutModal').addEventListener('click', function(e) { if (e.target === this) App.closeAbout(); });
 document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) App.closeSettings(); });
 
 //键盘
@@ -5303,7 +5287,7 @@ document.addEventListener('keydown', function(e) {
   else if (App._keyMatch('paste', e)) { if (!isEditing) App.pasteNodes(); }
   else if (App._keyMatch('autoModal', e)) { e.preventDefault(); App._autoOpenModal = !App._autoOpenModal; App._settings.setBool('autoModal', App._autoOpenModal); App.showToast(App.t(App._autoOpenModal ? 'toast.autoModalOn' : 'toast.autoModalOff')); }
   else if (App._keyMatch('chrome', e)) { e.preventDefault(); if (!isEditing) App.toggleChrome(); }
-  else if (e.key === 'Escape') { App.closeModal(); App.closeAbout(); App.closeSettings(); App.closeInlineEdit(); if (App._curveEditState) App._exitCurveEdit(true); }
+  else if (e.key === 'Escape') { App.closeModal(); App.closeSettings(); App.closeInlineEdit(); if (App._curveEditState) App._exitCurveEdit(true); }
   else if (App._keyMatch('delete', e) && !isEditing && !document.getElementById('modal').classList.contains('on')) {
     if (App.readOnly) return;
     if (App.selectedNodeIds.size > 0) { App.removeNodes([...App.selectedNodeIds]); }
@@ -5361,13 +5345,12 @@ document.addEventListener('keydown', function(e) {
     btnAddNode: 'addNode', btnClearAllNodes: 'clearAllNodes',
     btnDoExport: 'doExport', btnDoImport: 'doImport',
     btnCenterCanvas: 'centerCanvasOnNodes', undoBtn: 'canvasUndo', redoBtn: 'canvasRedo',
-    btnExportPNG: 'exportPNG', sidebarReadOnlyBtn: 'toggleReadOnly', btnShowAbout: 'showAbout',
+    btnExportPNG: 'exportPNG', sidebarReadOnlyBtn: 'toggleReadOnly',
     ctxEdit: 'ctxEdit', ctxDup: 'ctxDup', ctxMirror: 'ctxMirror',
     ctxResize: 'ctxResize', ctxResetSize: 'ctxResetSize', ctxProps: 'ctxProps',
     ctxCurve: 'ctxCurveDrag', ctxResetCurve: 'ctxResetCurve', ctxDel: 'ctxDel',
     btnCloseModal: 'closeModal', btnSaveModal: 'saveModal',
     btnCancelPicker: 'cancelCustomPicker', btnConfirmColor: 'confirmCustomColor',
-    btnCloseAbout: 'closeAbout',
     btnLangZh: 'setLangZh', btnLangEn: 'setLangEn',
     btnResetKeybinds: '_resetKeybinds'
   };
