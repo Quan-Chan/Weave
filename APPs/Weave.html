@@ -307,7 +307,6 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 .settings-panels{flex:1;min-width:0}
 .settings-panel{max-height:400px;overflow-y:auto;padding-right:4px}
 .settings-panel::-webkit-scrollbar{width:8px}.settings-panel::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:4px;border:2px solid transparent;background-clip:content-box}
-.set-note{font-size:11px;color:var(--text-muted);margin:0 0 10px}
 .set-keys{padding:0 2px}
 .set-sub{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.6px;margin:12px 0 6px;text-transform:uppercase}
 .set-sub:first-child{margin-top:0}
@@ -487,17 +486,17 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
           </div>
         </div>
         <div class="settings-panel" data-settings-panel="keys" style="display:none">
-          <div class="set-note" data-i18n="set.kbdHint">点击键位框后按下新快捷键，Enter 保存，Esc 取消</div>
           <div class="set-keys">
             <div class="set-sub" data-i18n="set.mouseTitle">鼠标操作</div>
             <div class="key-row"><span class="key-desc" data-i18n="set.dblclick">生成新节点</span><span class="key-value" data-i18n="set.kv.dblclick">双击空白处</span></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.dragNode">移动节点</span><span class="key-value" data-i18n="set.kv.dragNode">左键拖拽</span></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.socket">创建连线</span><span class="key-value" data-i18n="set.kv.socket">拖拽边缘圆点</span></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.dblTitle">编辑文字</span><span class="key-value" data-i18n="set.kv.dblTitle">双击标题</span></div>
-            <div class="key-row"><span class="key-desc" data-i18n="set.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span><span class="key-value" data-i18n="set.kv.ctxMenu">右键</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.ctxMenu">节点更多操作</span><span class="key-value" data-i18n="set.kv.ctxMenu">右键</span></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.box">框选多个节点</span><span class="key-value" data-i18n="set.kv.box">Shift + 拖拽</span></div>
-            <div class="key-row"><span class="key-desc" data-i18n="set.middle">平移画布（不会触发节点事件）</span><span class="key-value" data-i18n="set.kv.middle">中键拖拽 / 长按中键</span></div>
-            <div class="key-row"><span class="key-desc" data-i18n="set.wheel">缩放画布 / 切换节点颜色</span><span class="key-value" data-i18n="set.kv.wheel">滚轮 / Ctrl + 滚轮</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.middle">无交互移动画布</span><span class="key-value" data-i18n="set.kv.middle">中键拖拽 / 长按中键</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.wheel">缩放画布</span><span class="key-value" data-i18n="set.kv.wheel">滚轮</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.colorCycle">切换节点颜色</span><span class="key-value" data-i18n="set.kv.colorCycle">Ctrl + 滚轮</span></div>
             <div class="set-sub" data-i18n="set.keyTitle">键盘快捷键</div>
             <div class="key-row"><span class="key-desc" data-i18n="set.undo">撤销</span><input class="help-key" type="text" data-kb="undo" value="Ctrl+Z" readonly></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.redo">重做</span><input class="help-key" type="text" data-kb="redo" value="Ctrl+Y" readonly></div>
@@ -665,17 +664,16 @@ const I18N = {
     // 设置 · 键位设置
     'set.generalTitle': '常规',
     'set.keysTitle': '键位设置',
-    'set.kbdHint': '点击键位框后按下新快捷键，Enter 保存，Esc 取消',
     'set.mouseTitle': '鼠标操作', 'set.keyTitle': '键盘快捷键',
     'set.kv.dblclick': '双击空白处', 'set.kv.dragNode': '左键拖拽',
     'set.kv.socket': '拖拽边缘圆点', 'set.kv.dblTitle': '双击标题',
     'set.kv.ctxMenu': '右键', 'set.kv.box': 'Shift + 拖拽',
-    'set.kv.middle': '中键拖拽 / 长按中键', 'set.kv.wheel': '滚轮 / Ctrl + 滚轮',
+    'set.kv.middle': '中键拖拽 / 长按中键', 'set.kv.wheel': '滚轮', 'set.kv.colorCycle': 'Ctrl + 滚轮',
     'set.dblclick': '生成新节点', 'set.dragNode': '移动节点',
     'set.socket': '创建连线', 'set.dblTitle': '编辑文字',
-    'set.ctxMenu': '更多操作（复制 / 镜像 / 调整…）', 'set.box': '框选多个节点',
-    'set.middle': '平移画布（不会触发节点事件）',
-    'set.wheel': '缩放画布 / 切换节点颜色',
+    'set.ctxMenu': '节点更多操作', 'set.box': '框选多个节点',
+    'set.middle': '无交互移动画布',
+    'set.wheel': '缩放画布', 'set.colorCycle': '切换节点颜色',
     'set.undo': '撤销', 'set.redo': '重做', 'set.selectAll': '全选',
     'set.copy': '复制', 'set.paste': '粘贴', 'set.autoModal': '新建自动打开详情',
     'set.chrome': '隐藏 / 显示界面', 'set.delKey': '删除选中',
@@ -730,17 +728,16 @@ const I18N = {
     // 设置 · 键位设置
     'set.generalTitle': 'General',
     'set.keysTitle': 'Keybindings',
-    'set.kbdHint': 'Click a key field, press the new shortcut, Enter to save, Esc to cancel',
     'set.mouseTitle': 'Mouse', 'set.keyTitle': 'Keyboard shortcuts',
     'set.kv.dblclick': 'Double-click', 'set.kv.dragNode': 'Left-drag',
     'set.kv.socket': 'Drag a socket', 'set.kv.dblTitle': 'Double-click title',
     'set.kv.ctxMenu': 'Right-click', 'set.kv.box': 'Shift + drag',
-    'set.kv.middle': 'Middle-drag / hold', 'set.kv.wheel': 'Wheel / Ctrl + wheel',
+    'set.kv.middle': 'Middle-drag / hold', 'set.kv.wheel': 'Wheel', 'set.kv.colorCycle': 'Ctrl + wheel',
     'set.dblclick': 'to create a node', 'set.dragNode': 'to move it',
     'set.socket': 'to create a connection', 'set.dblTitle': 'to edit text',
-    'set.ctxMenu': 'for more actions (duplicate / mirror / resize…)', 'set.box': 'to box-select nodes',
-    'set.middle': 'to pan (never triggers node events)',
-    'set.wheel': 'to zoom / cycle node colors',
+    'set.ctxMenu': 'more actions for a node', 'set.box': 'to box-select nodes',
+    'set.middle': 'to pan without interacting',
+    'set.wheel': 'to zoom', 'set.colorCycle': 'to cycle node colors',
     'set.undo': 'Undo', 'set.redo': 'Redo', 'set.selectAll': 'Select all',
     'set.copy': 'Copy', 'set.paste': 'Paste', 'set.autoModal': 'Auto-open details for new nodes',
     'set.chrome': 'Toggle UI chrome', 'set.delKey': 'Delete selection',
