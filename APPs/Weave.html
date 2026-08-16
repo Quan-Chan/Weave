@@ -296,12 +296,16 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 .g-dot.active{border-color:#1a1d24;box-shadow:0 0 0 2px var(--accent-light)}
 
 /* ══ 快速入门视图（关于弹窗内）与语言按钮 ══ */
-.help-content{max-height:280px;overflow-y:auto;margin-bottom:14px;font-size:12px;line-height:1.5}
-.help-content::-webkit-scrollbar{width:2px}.help-content::-webkit-scrollbar-thumb{background:rgba(128,128,128,.15);border-radius:1px}
-.help-section{font-size:11px;font-weight:600;color:var(--text-muted);margin:10px 0 4px;letter-spacing:.4px}
+#aboutModal.help-mode #aboutModalBox{width:440px}
+.help-content{max-height:300px;overflow-y:auto;margin:2px 0 16px;padding:2px 4px 0 2px;font-size:12px;line-height:1.5}
+.help-content::-webkit-scrollbar{width:4px}.help-content::-webkit-scrollbar-thumb{background:rgba(128,128,128,.2);border-radius:2px}
+.help-section{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.6px;margin:16px 0 6px;text-transform:uppercase}
+.help-section::before{content:'';width:3px;height:12px;border-radius:2px;background:var(--accent);flex-shrink:0}
 .help-section:first-child{margin-top:0}
-.help-row{display:flex;gap:8px;padding:3px 0;align-items:baseline}
-.help-key{flex-shrink:0;min-width:130px;font-family:'Inter',monospace;font-size:11px;color:var(--accent);background:var(--accent-bg);border-radius:4px;padding:1px 6px;text-align:center;white-space:nowrap}
+.help-row{display:flex;align-items:center;gap:12px;padding:5px 8px;border-radius:9px;transition:background .12s ease}
+.help-row:hover{background:var(--bg-hover)}
+.help-key{flex-shrink:0;min-width:160px;font-family:'Inter',ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;font-weight:500;color:var(--text-primary);background:var(--bg-input);border:1px solid var(--border-light);border-bottom-width:2px;border-radius:7px;padding:3px 10px;text-align:center;white-space:nowrap;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.help-desc{font-size:12px;color:var(--text-secondary);line-height:1.45}
 .lang-btns{display:flex;gap:6px;flex-shrink:0}
 .lang-btn{padding:5px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);transition:.15s}
 .lang-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
@@ -428,20 +432,20 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
     </div>
     <div id="helpView" class="help-content" style="display:none">
       <div class="help-section" data-i18n="help.mouseTitle">鼠标操作</div>
-      <div class="help-row"><span class="help-key">双击空白处</span><span data-i18n="help.dblclick">生成新节点</span></div>
-      <div class="help-row"><span class="help-key">左键拖拽节点</span><span data-i18n="help.dragNode">移动节点</span></div>
-      <div class="help-row"><span class="help-key">拖拽节点边缘圆点</span><span data-i18n="help.socket">创建连线</span></div>
-      <div class="help-row"><span class="help-key">双击节点标题</span><span data-i18n="help.dblTitle">编辑文字</span></div>
-      <div class="help-row"><span class="help-key">右键节点 / 连线</span><span data-i18n="help.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span></div>
-      <div class="help-row"><span class="help-key">Shift + 拖拽</span><span data-i18n="help.box">框选多个节点</span></div>
-      <div class="help-row"><span class="help-key">中键拖拽 / 长按中键</span><span data-i18n="help.middle">平移画布（不会触发节点事件）</span></div>
-      <div class="help-row"><span class="help-key">滚轮 / Ctrl + 滚轮</span><span data-i18n="help.wheel">缩放画布 / 切换节点颜色</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.dblclick">双击空白处</span><span class="help-desc" data-i18n="help.dblclick">生成新节点</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.dragNode">左键拖拽节点</span><span class="help-desc" data-i18n="help.dragNode">移动节点</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.socket">拖拽节点边缘圆点</span><span class="help-desc" data-i18n="help.socket">创建连线</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.dblTitle">双击节点标题</span><span class="help-desc" data-i18n="help.dblTitle">编辑文字</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.ctxMenu">右键节点 / 连线</span><span class="help-desc" data-i18n="help.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.box">Shift + 拖拽</span><span class="help-desc" data-i18n="help.box">框选多个节点</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.middle">中键拖拽 / 长按中键</span><span class="help-desc" data-i18n="help.middle">平移画布（不会触发节点事件）</span></div>
+      <div class="help-row"><span class="help-key" data-i18n="help.k.wheel">滚轮 / Ctrl + 滚轮</span><span class="help-desc" data-i18n="help.wheel">缩放画布 / 切换节点颜色</span></div>
       <div class="help-section" data-i18n="help.keyTitle">键盘快捷键</div>
-      <div class="help-row"><span class="help-key">Ctrl+Z / Ctrl+Y</span><span data-i18n="help.undo">撤销 / 重做</span></div>
-      <div class="help-row"><span class="help-key">Ctrl+A / C / V</span><span data-i18n="help.clip">全选 / 复制 / 粘贴</span></div>
-      <div class="help-row"><span class="help-key">Delete</span><span data-i18n="help.delKey">删除选中</span></div>
-      <div class="help-row"><span class="help-key">Ctrl+H</span><span data-i18n="help.chrome">隐藏 / 显示界面</span></div>
-      <div class="help-row"><span class="help-key">Enter / Esc</span><span data-i18n="help.enterKey">保存 / 取消编辑</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+Z / Ctrl+Y</span><span class="help-desc" data-i18n="help.undo">撤销 / 重做</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+A / C / V</span><span class="help-desc" data-i18n="help.clip">全选 / 复制 / 粘贴</span></div>
+      <div class="help-row"><span class="help-key">Delete</span><span class="help-desc" data-i18n="help.delKey">删除选中</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+H</span><span class="help-desc" data-i18n="help.chrome">隐藏 / 显示界面</span></div>
+      <div class="help-row"><span class="help-key">Enter / Esc</span><span class="help-desc" data-i18n="help.enterKey">保存编辑 / 取消编辑</span></div>
     </div>
     <div id="aboutBtns" class="modal-btns">
       <button id="btnShowHelp" data-i18n="about.helpBtn">快速入门</button>
@@ -626,11 +630,15 @@ const I18N = {
     'set.language': '语言', 'set.languageDesc': '界面显示语言', 'set.close': '关闭',
     // 快速入门内容
     'help.mouseTitle': '鼠标操作', 'help.keyTitle': '键盘快捷键',
-    'help.dblclick': '双击空白处生成新节点', 'help.dragNode': '左键拖拽节点移动',
-    'help.socket': '拖拽节点边缘圆点创建连线', 'help.dblTitle': '双击节点标题编辑文字',
-    'help.ctxMenu': '右键节点 / 连线打开更多操作', 'help.box': 'Shift + 拖拽框选多个节点',
-    'help.middle': '中键拖拽 / 长按中键平移画布（不会触发节点事件）',
-    'help.wheel': '滚轮缩放画布；Ctrl + 滚轮切换节点颜色',
+    'help.k.dblclick': '双击空白处', 'help.k.dragNode': '左键拖拽节点',
+    'help.k.socket': '拖拽节点边缘圆点', 'help.k.dblTitle': '双击节点标题',
+    'help.k.ctxMenu': '右键节点 / 连线', 'help.k.box': 'Shift + 拖拽',
+    'help.k.middle': '中键拖拽 / 长按中键', 'help.k.wheel': '滚轮 / Ctrl + 滚轮',
+    'help.dblclick': '生成新节点', 'help.dragNode': '移动节点',
+    'help.socket': '创建连线', 'help.dblTitle': '编辑文字',
+    'help.ctxMenu': '更多操作（复制 / 镜像 / 调整…）', 'help.box': '框选多个节点',
+    'help.middle': '平移画布（不会触发节点事件）',
+    'help.wheel': '缩放画布 / 切换节点颜色',
     'help.undo': '撤销 / 重做', 'help.clip': '全选 / 复制 / 粘贴', 'help.delKey': '删除选中',
     'help.chrome': '隐藏 / 显示界面', 'help.enterKey': '保存编辑 / 取消编辑',
     // 通知（toast）
@@ -679,11 +687,15 @@ const I18N = {
     'set.snapSize': 'Snap size', 'set.snapSizeDesc': 'Snap node sizes to the grid; off for free resizing',
     'set.language': 'Language', 'set.languageDesc': 'UI language', 'set.close': 'Close',
     'help.mouseTitle': 'Mouse', 'help.keyTitle': 'Keyboard shortcuts',
-    'help.dblclick': 'Double-click empty canvas to create a node', 'help.dragNode': 'Drag a node to move it',
-    'help.socket': 'Drag from a node socket to create a connection', 'help.dblTitle': 'Double-click a title to edit text',
-    'help.ctxMenu': 'Right-click a node / connection for more actions', 'help.box': 'Shift + drag to box-select nodes',
-    'help.middle': 'Middle-drag or hold middle button to pan (never triggers node events)',
-    'help.wheel': 'Wheel zooms; Ctrl + wheel cycles node colors',
+    'help.k.dblclick': 'Double-click empty canvas', 'help.k.dragNode': 'Drag a node',
+    'help.k.socket': 'Drag from a socket', 'help.k.dblTitle': 'Double-click a title',
+    'help.k.ctxMenu': 'Right-click a node / connection', 'help.k.box': 'Shift + drag',
+    'help.k.middle': 'Middle-drag / hold middle', 'help.k.wheel': 'Wheel / Ctrl + wheel',
+    'help.dblclick': 'to create a node', 'help.dragNode': 'to move it',
+    'help.socket': 'to create a connection', 'help.dblTitle': 'to edit text',
+    'help.ctxMenu': 'for more actions (duplicate / mirror / resize…)', 'help.box': 'to box-select nodes',
+    'help.middle': 'to pan (never triggers node events)',
+    'help.wheel': 'to zoom / cycle node colors',
     'help.undo': 'Undo / Redo', 'help.clip': 'Select all / Copy / Paste', 'help.delKey': 'Delete selection',
     'help.chrome': 'Toggle UI chrome', 'help.enterKey': 'Commit / Cancel editing',
     'toast.readonlyUndo': 'Cannot undo in read-only mode', 'toast.noUndo': 'Nothing to undo', 'toast.undone': 'Undone',
@@ -1113,8 +1125,10 @@ Object.assign(App, {
     const help = document.getElementById('helpView');
     const title = document.getElementById('aboutTitle');
     const btn = document.getElementById('btnShowHelp');
+    const modal = document.getElementById('aboutModal');
     if (about) about.style.display = this._aboutViewHelp ? 'none' : '';
     if (help) help.style.display = this._aboutViewHelp ? '' : 'none';
+    if (modal) modal.classList.toggle('help-mode', this._aboutViewHelp);
     if (title) title.textContent = this.t(this._aboutViewHelp ? 'about.helpTitle' : 'about.title');
     if (btn) btn.textContent = this.t(this._aboutViewHelp ? 'about.back' : 'about.helpBtn');
   }
