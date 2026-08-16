@@ -295,17 +295,19 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 .g-dot:hover{transform:scale(1.15)}
 .g-dot.active{border-color:#1a1d24;box-shadow:0 0 0 2px var(--accent-light)}
 
-/* ══ 快速入门视图（关于弹窗内）与语言按钮 ══ */
-#aboutModal.help-mode #aboutModalBox{width:440px}
-.help-content{max-height:300px;overflow-y:auto;margin:2px 0 16px;padding:2px 4px 0 2px;font-size:12px;line-height:1.5}
-.help-content::-webkit-scrollbar{width:4px}.help-content::-webkit-scrollbar-thumb{background:rgba(128,128,128,.2);border-radius:2px}
-.help-section{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.6px;margin:16px 0 6px;text-transform:uppercase}
-.help-section::before{content:'';width:3px;height:12px;border-radius:2px;background:var(--accent);flex-shrink:0}
+/* ══ 快速入门视图（关于弹窗内）与语言按钮 ══
+   样式参考：现代软件快捷键面板（VS Code / macOS 设置 / Linear 风格）——
+   说明文字居左、深色键帽居右，行悬停高亮，分组标题大写字母距 */
+#aboutModal.help-mode #aboutModalBox{width:480px;border-radius:16px;padding:24px 24px 20px}
+.help-content{max-height:320px;overflow-y:auto;margin:6px 0 18px;padding:0 6px 0 2px}
+.help-content::-webkit-scrollbar{width:6px}.help-content::-webkit-scrollbar-thumb{background:rgba(128,128,128,.25);border-radius:3px}
+.help-section{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.9px;margin:20px 0 8px;text-transform:uppercase}
+.help-section::before{content:'';width:3px;height:13px;border-radius:2px;background:linear-gradient(var(--accent),var(--accent-hover));flex-shrink:0}
 .help-section:first-child{margin-top:0}
-.help-row{display:flex;align-items:center;gap:12px;padding:5px 8px;border-radius:9px;transition:background .12s ease}
+.help-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:7px 10px;border-radius:10px;transition:background .12s ease}
 .help-row:hover{background:var(--bg-hover)}
-.help-key{flex-shrink:0;min-width:160px;font-family:'Inter',ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;font-weight:500;color:var(--text-primary);background:var(--bg-input);border:1px solid var(--border-light);border-bottom-width:2px;border-radius:7px;padding:3px 10px;text-align:center;white-space:nowrap;box-shadow:0 1px 0 rgba(0,0,0,.04)}
-.help-desc{font-size:12px;color:var(--text-secondary);line-height:1.45}
+.help-desc{font-size:13px;color:var(--text-primary);line-height:1.4}
+.help-key{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;min-width:140px;font-family:'Inter',ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;font-weight:600;color:#fff;background:#3b4252;border-radius:6px;padding:4px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.2);white-space:nowrap;letter-spacing:.3px}
 .lang-btns{display:flex;gap:6px;flex-shrink:0}
 .lang-btn{padding:5px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);transition:.15s}
 .lang-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
