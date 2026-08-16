@@ -295,20 +295,22 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 .g-dot:hover{transform:scale(1.15)}
 .g-dot.active{border-color:#1a1d24;box-shadow:0 0 0 2px var(--accent-light)}
 
-/* ══ 快速入门视图（关于弹窗内）与语言按钮 ══
-   布局：功能说明居左、键位输入框居右；键盘快捷键可点击自定义 */
-#aboutModal.help-mode #aboutModalBox{width:560px;border-radius:16px;padding:24px 24px 20px;box-shadow:0 0 0 1px rgba(209,217,224,.45),0 6px 12px -3px rgba(37,41,46,.06),0 10px 24px rgba(37,41,46,.12)}
-.help-content{max-height:360px;overflow-y:auto;margin:8px 0 20px;padding:0 4px 0 2px}
-.help-content::-webkit-scrollbar{width:8px}.help-content::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:4px;border:2px solid transparent;background-clip:content-box}
-.help-section{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.9px;margin:22px 0 8px;text-transform:uppercase}
-.help-section::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--accent);flex-shrink:0}
-.help-section:first-child{margin-top:0}
-.help-note{font-size:11px;color:var(--text-muted);margin:0 0 10px;padding-left:11px}
-.help-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:6px 10px;border-radius:9px;transition:background .12s ease}
-.help-row:hover{background:var(--bg-hover)}
-.help-desc{font-size:13px;color:var(--text-primary);line-height:1.45}
-.help-keys{display:flex;gap:6px;flex-shrink:0}
-.help-key{width:136px;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-secondary);background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:4px 8px;text-align:center;white-space:nowrap;outline:none;transition:border-color .12s ease,background .12s ease;cursor:pointer;box-shadow:none}
+/* ══ 设置弹窗（分区卡片布局：常规 / 键位设置）与键位框 ══
+   键位设置：功能说明居左、键位输入框居右；键盘快捷键可点击自定义；
+   键位框显示按平台（Mac → Cmd，其余 → Ctrl） */
+#settingsModalBox{width:560px}
+.set-section{border:1px solid var(--border);border-radius:12px;padding:4px 14px 10px;margin-bottom:14px}
+.set-section-title{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.9px;margin:12px 0 4px;text-transform:uppercase}
+.set-section-title::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--accent);flex-shrink:0}
+.set-note{font-size:11px;color:var(--text-muted);margin:0 0 8px;padding-left:11px}
+.set-keys{max-height:280px;overflow-y:auto;padding:0 2px;margin:0 -2px}
+.set-keys::-webkit-scrollbar{width:8px}.set-keys::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.set-sub{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.6px;margin:12px 0 4px;text-transform:uppercase}
+.key-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:5px 8px;border-radius:9px;transition:background .12s ease}
+.key-row:hover{background:var(--bg-hover)}
+.key-desc{font-size:13px;color:var(--text-primary);line-height:1.45}
+.set-reset{display:flex;justify-content:flex-end;margin-top:10px}
+.help-key{width:136px;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-secondary);background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:4px 8px;text-align:center;white-space:nowrap;outline:none;transition:border-color .12s ease,background .12s ease;cursor:pointer;box-shadow:none;flex-shrink:0}
 .help-key:hover{border-color:var(--border-light)}
 .help-key:focus,.help-key.recording{border-color:var(--accent);background:#fff;color:var(--text-primary)}
 .help-key[readonly]{cursor:default}
@@ -429,64 +431,73 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 
 <div id="aboutModal" class="modal-overlay">
   <div id="aboutModalBox" class="modal-box">
-    <h3 id="aboutTitle" data-i18n="about.title">关于 Weave</h3>
-    <div id="aboutView" class="about-content">
+    <h3 data-i18n="about.title">关于 Weave</h3>
+    <div class="about-content">
       <div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
       <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
       <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.0</span></div>
       <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><span class="muted" data-i18n="about.projectUrlValue">暂无</span></div>
       <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
     </div>
-    <div id="helpView" class="help-content" style="display:none">
-      <div class="help-section" data-i18n="help.mouseTitle">鼠标操作</div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.dblclick">生成新节点</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.dblclick" value="双击空白处"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.dragNode">移动节点</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.dragNode" value="左键拖拽"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.socket">创建连线</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.socket" value="拖拽边缘圆点"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.dblTitle">编辑文字</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.dblTitle" value="双击标题"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.ctxMenu" value="右键"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.box">框选多个节点</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.box" value="Shift + 拖拽"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.middle">平移画布（不会触发节点事件）</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.middle" value="中键拖拽 / 长按中键"></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.wheel">缩放画布 / 切换节点颜色</span><input class="help-key" type="text" readonly data-i18n-value="help.kv.wheel" value="滚轮 / Ctrl + 滚轮"></div>
-      <div class="help-section" data-i18n="help.keyTitle">键盘快捷键</div>
-      <div class="help-note" data-i18n="help.kbdHint">点击键位框后按下新快捷键，Enter 保存，Esc 取消</div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.undo">撤销 / 重做</span><div class="help-keys"><input class="help-key" type="text" data-kb="undo" value="Ctrl+Z" readonly><input class="help-key" type="text" data-kb="redo" value="Ctrl+Y" readonly></div></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.clip">全选 / 复制 / 粘贴</span><div class="help-keys"><input class="help-key" type="text" data-kb="selectAll" value="Ctrl+A" readonly><input class="help-key" type="text" data-kb="copy" value="Ctrl+C" readonly><input class="help-key" type="text" data-kb="paste" value="Ctrl+V" readonly></div></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.delKey">删除选中</span><input class="help-key" type="text" data-kb="delete" value="Delete" readonly></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.chrome">隐藏 / 显示界面</span><input class="help-key" type="text" data-kb="chrome" value="Ctrl+H" readonly></div>
-      <div class="help-row"><span class="help-desc" data-i18n="help.enterKey">保存编辑 / 取消编辑</span><div class="help-keys"><input class="help-key" type="text" readonly value="Enter"><input class="help-key" type="text" readonly value="Esc"></div></div>
-    </div>
     <div id="aboutBtns" class="modal-btns">
-      <button id="btnShowHelp" data-i18n="about.helpBtn">快速入门</button>
       <button id="btnCloseAbout" data-i18n="about.close">关闭</button>
     </div>
   </div>
 </div>
 
 <div id="settingsModal" class="modal-overlay">
-  <div id="settingsModalBox" class="modal-box">
+  <div id="settingsModalBox" class="modal-box settings-box">
     <h3 data-i18n="set.title">设置</h3>
-    <div class="setting-row">
-      <div class="s-label">
-        <div class="s-title" data-i18n="set.snapNodes">对齐节点</div>
-        <div class="s-desc" data-i18n="set.snapNodesDesc">节点位置对齐到网格；关闭后自由摆放</div>
+    <div class="set-section">
+      <div class="set-section-title" data-i18n="set.generalTitle">常规</div>
+      <div class="setting-row">
+        <div class="s-label">
+          <div class="s-title" data-i18n="set.snapNodes">对齐节点</div>
+          <div class="s-desc" data-i18n="set.snapNodesDesc">节点位置对齐到网格；关闭后自由摆放</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="setSnapNodes"><span class="track"></span><span class="thumb"></span></label>
       </div>
-      <label class="switch"><input type="checkbox" id="setSnapNodes"><span class="track"></span><span class="thumb"></span></label>
+      <div class="setting-row">
+        <div class="s-label">
+          <div class="s-title" data-i18n="set.snapSize">节点大小对齐</div>
+          <div class="s-desc" data-i18n="set.snapSizeDesc">节点大小对齐到网格；关闭后自由调整</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="setSnapSize"><span class="track"></span><span class="thumb"></span></label>
+      </div>
+      <div class="setting-row">
+        <div class="s-label">
+          <div class="s-title" data-i18n="set.language">语言</div>
+          <div class="s-desc" data-i18n="set.languageDesc">界面显示语言</div>
+        </div>
+        <div class="lang-btns" id="langBtns">
+          <button class="lang-btn" id="btnLangZh">中文</button>
+          <button class="lang-btn" id="btnLangEn">English</button>
+        </div>
+      </div>
     </div>
-    <div class="setting-row">
-      <div class="s-label">
-        <div class="s-title" data-i18n="set.snapSize">节点大小对齐</div>
-        <div class="s-desc" data-i18n="set.snapSizeDesc">节点大小对齐到网格；关闭后自由调整</div>
-      </div>
-      <label class="switch"><input type="checkbox" id="setSnapSize"><span class="track"></span><span class="thumb"></span></label>
-    </div>
-    <div class="setting-row">
-      <div class="s-label">
-        <div class="s-title" data-i18n="set.language">语言</div>
-        <div class="s-desc" data-i18n="set.languageDesc">界面显示语言</div>
-      </div>
-      <div class="lang-btns" id="langBtns">
-        <button class="lang-btn" id="btnLangZh">中文</button>
-        <button class="lang-btn" id="btnLangEn">English</button>
+    <div class="set-section">
+      <div class="set-section-title" data-i18n="set.keysTitle">键位设置</div>
+      <div class="set-note" data-i18n="set.kbdHint">点击键位框后按下新快捷键，Enter 保存，Esc 取消</div>
+      <div class="set-keys">
+        <div class="set-sub" data-i18n="set.mouseTitle">鼠标操作</div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.dblclick">生成新节点</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.dblclick" value="双击空白处"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.dragNode">移动节点</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.dragNode" value="左键拖拽"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.socket">创建连线</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.socket" value="拖拽边缘圆点"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.dblTitle">编辑文字</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.dblTitle" value="双击标题"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.ctxMenu" value="右键"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.box">框选多个节点</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.box" value="Shift + 拖拽"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.middle">平移画布（不会触发节点事件）</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.middle" value="中键拖拽 / 长按中键"></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.wheel">缩放画布 / 切换节点颜色</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.wheel" value="滚轮 / Ctrl + 滚轮"></div>
+        <div class="set-sub" data-i18n="set.keyTitle">键盘快捷键</div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.undo">撤销</span><input class="help-key" type="text" data-kb="undo" value="Ctrl+Z" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.redo">重做</span><input class="help-key" type="text" data-kb="redo" value="Ctrl+Y" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.selectAll">全选</span><input class="help-key" type="text" data-kb="selectAll" value="Ctrl+A" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.copy">复制</span><input class="help-key" type="text" data-kb="copy" value="Ctrl+C" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.paste">粘贴</span><input class="help-key" type="text" data-kb="paste" value="Ctrl+V" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.autoModal">新建自动打开详情</span><input class="help-key" type="text" data-kb="autoModal" value="Ctrl+E" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.chrome">隐藏 / 显示界面</span><input class="help-key" type="text" data-kb="chrome" value="Ctrl+H" readonly></div>
+        <div class="key-row"><span class="key-desc" data-i18n="set.delKey">删除选中</span><input class="help-key" type="text" data-kb="delete" value="Delete" readonly></div>
+        <div class="set-reset"><button class="btn btn-secondary" id="btnResetKeybinds" data-i18n="set.resetKeys">重置键位</button></div>
       </div>
     </div>
     <div id="settingsBtns" class="modal-btns">
@@ -610,6 +621,9 @@ const RESIZE_HANDLES_HTML =
 //连线自身的 id（conn.id）代替。
 const connKeyOf = (from, to) => from + '|' + to;
 
+// 平台检测：键位显示与默认修饰键按平台（Mac → Cmd，其余 → Ctrl）。
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+
 // ── 界面语言词典（zh/en 双语；切换入口在设置弹窗，见 M11）──
 // 键 = 语义键；t(key, params) 负责取值与 {占位符} 替换（见 M02 基础设施）。
 const I18N = {
@@ -631,25 +645,29 @@ const I18N = {
     // 关于 / 快速入门
     'about.title': '关于 Weave', 'about.appName': '软件名称', 'about.version': '版本号',
     'about.projectUrl': '项目地址', 'about.projectUrlValue': '暂无', 'about.devHome': '开发者主页',
-    'about.close': '关闭', 'about.helpBtn': '快速入门', 'about.back': '软件详情', 'about.helpTitle': '快速入门',
+    'about.close': '关闭',
     // 设置
     'set.title': '设置', 'set.snapNodes': '对齐节点', 'set.snapNodesDesc': '节点位置对齐到网格；关闭后自由摆放',
     'set.snapSize': '节点大小对齐', 'set.snapSizeDesc': '节点大小对齐到网格；关闭后自由调整',
     'set.language': '语言', 'set.languageDesc': '界面显示语言', 'set.close': '关闭',
-    // 快速入门内容
-    'help.mouseTitle': '鼠标操作', 'help.keyTitle': '键盘快捷键',
-    'help.kv.dblclick': '双击空白处', 'help.kv.dragNode': '左键拖拽',
-    'help.kv.socket': '拖拽边缘圆点', 'help.kv.dblTitle': '双击标题',
-    'help.kv.ctxMenu': '右键', 'help.kv.box': 'Shift + 拖拽',
-    'help.kv.middle': '中键拖拽 / 长按中键', 'help.kv.wheel': '滚轮 / Ctrl + 滚轮',
-    'help.kbdHint': '点击键位框后按下新快捷键，Enter 保存，Esc 取消',
-    'help.dblclick': '生成新节点', 'help.dragNode': '移动节点',
-    'help.socket': '创建连线', 'help.dblTitle': '编辑文字',
-    'help.ctxMenu': '更多操作（复制 / 镜像 / 调整…）', 'help.box': '框选多个节点',
-    'help.middle': '平移画布（不会触发节点事件）',
-    'help.wheel': '缩放画布 / 切换节点颜色',
-    'help.undo': '撤销 / 重做', 'help.clip': '全选 / 复制 / 粘贴', 'help.delKey': '删除选中',
-    'help.chrome': '隐藏 / 显示界面', 'help.enterKey': '保存编辑 / 取消编辑',
+    // 设置 · 键位设置
+    'set.generalTitle': '常规',
+    'set.keysTitle': '键位设置',
+    'set.kbdHint': '点击键位框后按下新快捷键，Enter 保存，Esc 取消',
+    'set.mouseTitle': '鼠标操作', 'set.keyTitle': '键盘快捷键',
+    'set.kv.dblclick': '双击空白处', 'set.kv.dragNode': '左键拖拽',
+    'set.kv.socket': '拖拽边缘圆点', 'set.kv.dblTitle': '双击标题',
+    'set.kv.ctxMenu': '右键', 'set.kv.box': 'Shift + 拖拽',
+    'set.kv.middle': '中键拖拽 / 长按中键', 'set.kv.wheel': '滚轮 / Ctrl + 滚轮',
+    'set.dblclick': '生成新节点', 'set.dragNode': '移动节点',
+    'set.socket': '创建连线', 'set.dblTitle': '编辑文字',
+    'set.ctxMenu': '更多操作（复制 / 镜像 / 调整…）', 'set.box': '框选多个节点',
+    'set.middle': '平移画布（不会触发节点事件）',
+    'set.wheel': '缩放画布 / 切换节点颜色',
+    'set.undo': '撤销', 'set.redo': '重做', 'set.selectAll': '全选',
+    'set.copy': '复制', 'set.paste': '粘贴', 'set.autoModal': '新建自动打开详情',
+    'set.chrome': '隐藏 / 显示界面', 'set.delKey': '删除选中',
+    'set.resetKeys': '重置键位',
     // 通知（toast）
     'toast.readonlyUndo': '只读模式无法撤销', 'toast.noUndo': '没有可撤销的操作', 'toast.undone': '已撤销',
     'toast.readonlyRedo': '只读模式无法重做', 'toast.noRedo': '没有可重做的操作', 'toast.redone': '已重做',
@@ -672,6 +690,7 @@ const I18N = {
     'toast.readonlyOn': '已切换至只读模式', 'toast.readonlyOff': '已切换至编辑模式',
     'toast.chromeHidden': '已隐藏界面（Ctrl+H 恢复）', 'toast.chromeShown': '已显示界面',
     'toast.keybindSaved': '快捷键已更新', 'toast.keybindConflict': '该快捷键已被其他操作使用',
+    'toast.keysReset': '键位已重置为默认',
     // 其他
     'misc.newNode': '新节点', 'misc.statusBadge': '{nodes} 节点 · {conns} 连线',
     'misc.color.blue': '蓝色', 'misc.color.cyan': '青色', 'misc.color.green': '绿色',
@@ -691,24 +710,29 @@ const I18N = {
     'modal.cancel': 'Cancel', 'modal.save': 'Save', 'modal.customColor': 'Custom color', 'modal.confirm': 'OK',
     'about.title': 'About Weave', 'about.appName': 'Name', 'about.version': 'Version',
     'about.projectUrl': 'Project', 'about.projectUrlValue': 'N/A', 'about.devHome': 'Developer',
-    'about.close': 'Close', 'about.helpBtn': 'Quick start', 'about.back': 'About', 'about.helpTitle': 'Quick start',
+    'about.close': 'Close',
     'set.title': 'Settings', 'set.snapNodes': 'Snap nodes',
     'set.snapNodesDesc': 'Snap node positions to the grid; off for free placement',
     'set.snapSize': 'Snap size', 'set.snapSizeDesc': 'Snap node sizes to the grid; off for free resizing',
     'set.language': 'Language', 'set.languageDesc': 'UI language', 'set.close': 'Close',
-    'help.mouseTitle': 'Mouse', 'help.keyTitle': 'Keyboard shortcuts',
-    'help.kv.dblclick': 'Double-click', 'help.kv.dragNode': 'Left-drag',
-    'help.kv.socket': 'Drag a socket', 'help.kv.dblTitle': 'Double-click title',
-    'help.kv.ctxMenu': 'Right-click', 'help.kv.box': 'Shift + drag',
-    'help.kv.middle': 'Middle-drag / hold', 'help.kv.wheel': 'Wheel / Ctrl + wheel',
-    'help.kbdHint': 'Click a key field, press the new shortcut, Enter to save, Esc to cancel',
-    'help.dblclick': 'to create a node', 'help.dragNode': 'to move it',
-    'help.socket': 'to create a connection', 'help.dblTitle': 'to edit text',
-    'help.ctxMenu': 'for more actions (duplicate / mirror / resize…)', 'help.box': 'to box-select nodes',
-    'help.middle': 'to pan (never triggers node events)',
-    'help.wheel': 'to zoom / cycle node colors',
-    'help.undo': 'Undo / Redo', 'help.clip': 'Select all / Copy / Paste', 'help.delKey': 'Delete selection',
-    'help.chrome': 'Toggle UI chrome', 'help.enterKey': 'Commit / Cancel editing',
+    // 设置 · 键位设置
+    'set.generalTitle': 'General',
+    'set.keysTitle': 'Keybindings',
+    'set.kbdHint': 'Click a key field, press the new shortcut, Enter to save, Esc to cancel',
+    'set.mouseTitle': 'Mouse', 'set.keyTitle': 'Keyboard shortcuts',
+    'set.kv.dblclick': 'Double-click', 'set.kv.dragNode': 'Left-drag',
+    'set.kv.socket': 'Drag a socket', 'set.kv.dblTitle': 'Double-click title',
+    'set.kv.ctxMenu': 'Right-click', 'set.kv.box': 'Shift + drag',
+    'set.kv.middle': 'Middle-drag / hold', 'set.kv.wheel': 'Wheel / Ctrl + wheel',
+    'set.dblclick': 'to create a node', 'set.dragNode': 'to move it',
+    'set.socket': 'to create a connection', 'set.dblTitle': 'to edit text',
+    'set.ctxMenu': 'for more actions (duplicate / mirror / resize…)', 'set.box': 'to box-select nodes',
+    'set.middle': 'to pan (never triggers node events)',
+    'set.wheel': 'to zoom / cycle node colors',
+    'set.undo': 'Undo', 'set.redo': 'Redo', 'set.selectAll': 'Select all',
+    'set.copy': 'Copy', 'set.paste': 'Paste', 'set.autoModal': 'Auto-open details for new nodes',
+    'set.chrome': 'Toggle UI chrome', 'set.delKey': 'Delete selection',
+    'set.resetKeys': 'Reset keybindings',
     'toast.readonlyUndo': 'Cannot undo in read-only mode', 'toast.noUndo': 'Nothing to undo', 'toast.undone': 'Undone',
     'toast.readonlyRedo': 'Cannot redo in read-only mode', 'toast.noRedo': 'Nothing to redo', 'toast.redone': 'Redone',
     'toast.invalidFile': 'Invalid save file', 'toast.importOk': 'Imported successfully',
@@ -730,6 +754,7 @@ const I18N = {
     'toast.readonlyOn': 'Read-only mode on', 'toast.readonlyOff': 'Edit mode on',
     'toast.chromeHidden': 'UI hidden (Ctrl+H to restore)', 'toast.chromeShown': 'UI shown',
     'toast.keybindSaved': 'Shortcut updated', 'toast.keybindConflict': 'Shortcut already in use by another action',
+    'toast.keysReset': 'Keybindings reset to defaults',
     'misc.newNode': 'New node', 'misc.statusBadge': '{nodes} nodes · {conns} connections',
     'misc.color.blue': 'Blue', 'misc.color.cyan': 'Cyan', 'misc.color.green': 'Green',
     'misc.color.yellow': 'Yellow', 'misc.color.orange': 'Orange'
@@ -955,9 +980,7 @@ const App = window.App = {
   _addCounter: 0,
   //界面语言（'zh' | 'en'），见设置弹窗；持久化键 'lang'。
   _lang: 'zh',
-  //关于弹窗当前视图：false=软件详情，true=快速入门（首次打开自动显示快速入门）。
-  _aboutViewHelp: false,
-  //可自定义快捷键表（action → 组合键描述），见 _loadKeybinds / 快速入门。
+  //可自定义快捷键表（action → 组合键描述），见 _loadKeybinds / 设置弹窗。
   _keybinds: null,
   //键位录制会话（{ action, input, onKey }），见 _startKeybindEdit。
   _keybindEditing: null,
@@ -1132,23 +1155,6 @@ Object.assign(App, {
     const enBtn = document.getElementById('btnLangEn');
     if (zhBtn) zhBtn.classList.toggle('active', this._lang !== 'en');
     if (enBtn) enBtn.classList.toggle('active', this._lang === 'en');
-  },
-  //关于弹窗视图切换：软件详情 ↔ 快速入门（按钮在关闭按钮左侧）。
-  toggleAboutView() {
-    this._aboutViewHelp = !this._aboutViewHelp;
-    this._syncAboutView();
-  },
-  _syncAboutView() {
-    const about = document.getElementById('aboutView');
-    const help = document.getElementById('helpView');
-    const title = document.getElementById('aboutTitle');
-    const btn = document.getElementById('btnShowHelp');
-    const modal = document.getElementById('aboutModal');
-    if (about) about.style.display = this._aboutViewHelp ? 'none' : '';
-    if (help) help.style.display = this._aboutViewHelp ? '' : 'none';
-    if (modal) modal.classList.toggle('help-mode', this._aboutViewHelp);
-    if (title) title.textContent = this.t(this._aboutViewHelp ? 'about.helpTitle' : 'about.title');
-    if (btn) btn.textContent = this.t(this._aboutViewHelp ? 'about.back' : 'about.helpBtn');
   }
 });
 
@@ -3648,10 +3654,10 @@ Object.assign(App, {
     }
     return ctrl === !!b.ctrl && meta === !!b.meta && alt === !!b.alt && shift === !!b.shift;
   },
-  //组合键显示文本（如 "Ctrl+Z" / "Ctrl/Cmd+Shift+X"）。
+  //组合键显示文本（如 "Ctrl+Z"；Mac 平台默认修饰键显示 "Cmd+Z"）。
   _keybindLabel(b) {
     const parts = [];
-    if (b.anyMod) parts.push('Ctrl/Cmd');
+    if (b.anyMod) parts.push(IS_MAC ? 'Cmd' : 'Ctrl');
     if (b.ctrl) parts.push('Ctrl');
     if (b.meta) parts.push('Cmd');
     if (b.alt) parts.push('Alt');
@@ -3709,10 +3715,10 @@ Object.assign(App, {
     this._keybindEditing = null;
     document.removeEventListener('keydown', s.onKey, true);
   },
-  //填充快速入门中的键位框并绑定录制交互（Init 调用一次）。
+  //填充设置弹窗中的键位框并绑定录制交互（Init 调用一次）。
   _bindKeybindInputs() {
     const self = this;
-    document.querySelectorAll('#helpView input[data-kb]').forEach(input => {
+    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
       const action = input.getAttribute('data-kb');
       const b = this._keybinds[action];
       if (b) input.value = this._keybindLabel(b);
@@ -3721,6 +3727,16 @@ Object.assign(App, {
         self._startKeybindEdit(action, input);
       });
     });
+  },
+  //重置全部快捷键为平台默认（键位框即时刷新并持久化）。
+  _resetKeybinds() {
+    this._settings.set('keybinds', '');   //清空用户存档 → _loadKeybinds 返回纯默认
+    this._keybinds = this._loadKeybinds();
+    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
+      const b = this._keybinds[input.getAttribute('data-kb')];
+      if (b) input.value = this._keybindLabel(b);
+    });
+    this.showToast(this.t('toast.keysReset'));
   }
 });
 
@@ -4432,25 +4448,19 @@ Object.assign(App, {
     this.showToast(this.t(this.readOnly ? 'toast.readonlyOn' : 'toast.readonlyOff'));
   },
 
-  //打开关于弹窗；showHelp=true 时直接显示快速入门视图
-  //（首次启动由 Init 调用，见 helpSeen 标记）。
-  showAbout(showHelp) {
-    if (showHelp && !this._aboutViewHelp) this.toggleAboutView();
+  showAbout() {
     document.getElementById('aboutModal').classList.add('on');
   },
   closeAbout() {
     document.getElementById('aboutModal').classList.remove('on');
-    //关闭后复位到"软件详情"视图（下次打开不再停留在快速入门）；
-    //首次启动的快速入门看过一次后不再自动弹出。
-    this._aboutViewHelp = false;
-    this._syncAboutView();
-    this._settings.setBool('helpSeen', true);
   },
   showSettings() {
     document.getElementById('settingsModal').classList.add('on');
   },
   closeSettings() {
     document.getElementById('settingsModal').classList.remove('on');
+    //首次启动的键位设置（设置弹窗）看过一次后不再自动弹出。
+    this._settings.setBool('helpSeen', true);
   },
   //专注模式（Ctrl+H）：隐藏顶部工具栏与右侧边栏。画布
   //会填满整个窗口；由于舞台尺寸发生改变，视口缓存需刷新，
@@ -5339,8 +5349,9 @@ document.addEventListener('keydown', function(e) {
     ctxCurve: 'ctxCurveDrag', ctxResetCurve: 'ctxResetCurve', ctxDel: 'ctxDel',
     btnCloseModal: 'closeModal', btnSaveModal: 'saveModal',
     btnCancelPicker: 'cancelCustomPicker', btnConfirmColor: 'confirmCustomColor',
-    btnShowHelp: 'toggleAboutView', btnCloseAbout: 'closeAbout',
-    btnLangZh: 'setLangZh', btnLangEn: 'setLangEn'
+    btnCloseAbout: 'closeAbout',
+    btnLangZh: 'setLangZh', btnLangEn: 'setLangEn',
+    btnResetKeybinds: '_resetKeybinds'
   };
   for (const id of Object.keys(BIND_CLICKS)) {
     document.getElementById(id).addEventListener('click', () => App[BIND_CLICKS[id]]());
@@ -5369,9 +5380,9 @@ document.addEventListener('keydown', function(e) {
   document.getElementById('btnShowSettings').addEventListener('click', () => App.showSettings());
   document.getElementById('btnCloseSettings').addEventListener('click', () => App.closeSettings());
 
-  /* 首次启动：自动弹出快速入门（看过一次后不再弹出） */
+  /* 首次启动：自动弹出设置弹窗（含键位设置；看过一次后不再弹出） */
   if (!App._settings.getBool('helpSeen')) {
-    App.showAbout(true);
+    App.showSettings();
   }
 
   /* 初始化带悬停缓冲的代际颜色选择器下拉框 */

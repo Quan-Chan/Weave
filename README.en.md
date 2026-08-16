@@ -23,7 +23,7 @@
 - **Canvas** — pan (drag / middle button), wheel zoom, fit view, editable coordinate HUD
 - **Colors** — 5 presets + custom color-wheel picker, Ctrl+wheel to cycle quickly
 - **Import / Export** — JSON import/export (with viewport info), PNG export, drag-and-drop JSON import
-- **More** — undo/redo (up to 50 steps), read-only mode, auto-save to localStorage, focus mode (Ctrl+H), language switch (中文 / English) in Settings
+- **More** — undo/redo (up to 50 steps), read-only mode, auto-save to localStorage, focus mode (Ctrl+H), language switch (中文 / English) in Settings, customizable keybindings (shown on first launch)
 
 <hr>
 
