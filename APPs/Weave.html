@@ -295,20 +295,26 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 .g-dot:hover{transform:scale(1.15)}
 .g-dot.active{border-color:#1a1d24;box-shadow:0 0 0 2px var(--accent-light)}
 
-/* ══ 设置弹窗（分区卡片布局：常规 / 键位设置）与键位框 ══
-   键位设置：功能说明居左、键位输入框居右；键盘快捷键可点击自定义；
-   键位框显示按平台（Mac → Cmd，其余 → Ctrl） */
-#settingsModalBox{width:560px}
-.set-section{border:1px solid var(--border);border-radius:12px;padding:4px 14px 10px;margin-bottom:14px}
-.set-section-title{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.9px;margin:12px 0 4px;text-transform:uppercase}
-.set-section-title::before{content:'';width:3px;height:13px;border-radius:2px;background:var(--accent);flex-shrink:0}
-.set-note{font-size:11px;color:var(--text-muted);margin:0 0 8px;padding-left:11px}
-.set-keys{max-height:280px;overflow-y:auto;padding:0 2px;margin:0 -2px}
-.set-keys::-webkit-scrollbar{width:8px}.set-keys::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:4px;border:2px solid transparent;background-clip:content-box}
-.set-sub{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.6px;margin:12px 0 4px;text-transform:uppercase}
+/* ══ 设置弹窗（左侧导航 + 右侧内容）与键位框 ══
+   键位设置：功能说明居左、键位框居右；键盘快捷键可点击自定义；
+   键位显示按平台（Mac → Cmd，其余 → Ctrl） */
+#settingsModalBox{width:600px}
+.settings-body{display:flex;gap:16px;margin:6px 0 16px;min-height:360px}
+.settings-nav{width:128px;flex-shrink:0;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--border);padding-right:12px}
+.settings-nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:none;background:transparent;font-family:inherit;font-size:13px;color:var(--text-secondary);cursor:pointer;text-align:left;transition:background .12s ease,color .12s ease}
+.settings-nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.settings-nav-item.active{background:var(--accent-bg);color:var(--accent);font-weight:600}
+.settings-panels{flex:1;min-width:0}
+.settings-panel{max-height:400px;overflow-y:auto;padding-right:4px}
+.settings-panel::-webkit-scrollbar{width:8px}.settings-panel::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.set-note{font-size:11px;color:var(--text-muted);margin:0 0 10px}
+.set-keys{padding:0 2px}
+.set-sub{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.6px;margin:12px 0 6px;text-transform:uppercase}
+.set-sub:first-child{margin-top:0}
 .key-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:5px 8px;border-radius:9px;transition:background .12s ease}
 .key-row:hover{background:var(--bg-hover)}
 .key-desc{font-size:13px;color:var(--text-primary);line-height:1.45}
+.key-value{font-size:12px;color:var(--text-secondary);white-space:nowrap;flex-shrink:0}
 .set-reset{display:flex;justify-content:flex-end;margin-top:10px}
 .help-key{width:136px;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-secondary);background:var(--bg-input);border:1px solid var(--border);border-radius:7px;padding:4px 8px;text-align:center;white-space:nowrap;outline:none;transition:border-color .12s ease,background .12s ease;cursor:pointer;box-shadow:none;flex-shrink:0}
 .help-key:hover{border-color:var(--border-light)}
@@ -448,56 +454,62 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
 <div id="settingsModal" class="modal-overlay">
   <div id="settingsModalBox" class="modal-box settings-box">
     <h3 data-i18n="set.title">设置</h3>
-    <div class="set-section">
-      <div class="set-section-title" data-i18n="set.generalTitle">常规</div>
-      <div class="setting-row">
-        <div class="s-label">
-          <div class="s-title" data-i18n="set.snapNodes">对齐节点</div>
-          <div class="s-desc" data-i18n="set.snapNodesDesc">节点位置对齐到网格；关闭后自由摆放</div>
-        </div>
-        <label class="switch"><input type="checkbox" id="setSnapNodes"><span class="track"></span><span class="thumb"></span></label>
+    <div class="settings-body">
+      <div class="settings-nav">
+        <button class="settings-nav-item active" data-settings-tab="general" data-i18n="set.generalTitle">常规</button>
+        <button class="settings-nav-item" data-settings-tab="keys" data-i18n="set.keysTitle">键位设置</button>
       </div>
-      <div class="setting-row">
-        <div class="s-label">
-          <div class="s-title" data-i18n="set.snapSize">节点大小对齐</div>
-          <div class="s-desc" data-i18n="set.snapSizeDesc">节点大小对齐到网格；关闭后自由调整</div>
+      <div class="settings-panels">
+        <div class="settings-panel" data-settings-panel="general">
+          <div class="setting-row">
+            <div class="s-label">
+              <div class="s-title" data-i18n="set.snapNodes">对齐节点</div>
+              <div class="s-desc" data-i18n="set.snapNodesDesc">节点位置对齐到网格；关闭后自由摆放</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="setSnapNodes"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting-row">
+            <div class="s-label">
+              <div class="s-title" data-i18n="set.snapSize">节点大小对齐</div>
+              <div class="s-desc" data-i18n="set.snapSizeDesc">节点大小对齐到网格；关闭后自由调整</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="setSnapSize"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting-row">
+            <div class="s-label">
+              <div class="s-title" data-i18n="set.language">语言</div>
+              <div class="s-desc" data-i18n="set.languageDesc">界面显示语言</div>
+            </div>
+            <div class="lang-btns" id="langBtns">
+              <button class="lang-btn" id="btnLangZh">中文</button>
+              <button class="lang-btn" id="btnLangEn">English</button>
+            </div>
+          </div>
         </div>
-        <label class="switch"><input type="checkbox" id="setSnapSize"><span class="track"></span><span class="thumb"></span></label>
-      </div>
-      <div class="setting-row">
-        <div class="s-label">
-          <div class="s-title" data-i18n="set.language">语言</div>
-          <div class="s-desc" data-i18n="set.languageDesc">界面显示语言</div>
+        <div class="settings-panel" data-settings-panel="keys" style="display:none">
+          <div class="set-note" data-i18n="set.kbdHint">点击键位框后按下新快捷键，Enter 保存，Esc 取消</div>
+          <div class="set-keys">
+            <div class="set-sub" data-i18n="set.mouseTitle">鼠标操作</div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.dblclick">生成新节点</span><span class="key-value" data-i18n="set.kv.dblclick">双击空白处</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.dragNode">移动节点</span><span class="key-value" data-i18n="set.kv.dragNode">左键拖拽</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.socket">创建连线</span><span class="key-value" data-i18n="set.kv.socket">拖拽边缘圆点</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.dblTitle">编辑文字</span><span class="key-value" data-i18n="set.kv.dblTitle">双击标题</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span><span class="key-value" data-i18n="set.kv.ctxMenu">右键</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.box">框选多个节点</span><span class="key-value" data-i18n="set.kv.box">Shift + 拖拽</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.middle">平移画布（不会触发节点事件）</span><span class="key-value" data-i18n="set.kv.middle">中键拖拽 / 长按中键</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.wheel">缩放画布 / 切换节点颜色</span><span class="key-value" data-i18n="set.kv.wheel">滚轮 / Ctrl + 滚轮</span></div>
+            <div class="set-sub" data-i18n="set.keyTitle">键盘快捷键</div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.undo">撤销</span><input class="help-key" type="text" data-kb="undo" value="Ctrl+Z" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.redo">重做</span><input class="help-key" type="text" data-kb="redo" value="Ctrl+Y" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.selectAll">全选</span><input class="help-key" type="text" data-kb="selectAll" value="Ctrl+A" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.copy">复制</span><input class="help-key" type="text" data-kb="copy" value="Ctrl+C" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.paste">粘贴</span><input class="help-key" type="text" data-kb="paste" value="Ctrl+V" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.autoModal">新建自动打开详情</span><input class="help-key" type="text" data-kb="autoModal" value="Ctrl+E" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.chrome">隐藏 / 显示界面</span><input class="help-key" type="text" data-kb="chrome" value="Ctrl+H" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.delKey">删除选中</span><input class="help-key" type="text" data-kb="delete" value="Delete" readonly></div>
+            <div class="set-reset"><button class="btn btn-secondary" id="btnResetKeybinds" data-i18n="set.resetKeys">重置键位</button></div>
+          </div>
         </div>
-        <div class="lang-btns" id="langBtns">
-          <button class="lang-btn" id="btnLangZh">中文</button>
-          <button class="lang-btn" id="btnLangEn">English</button>
-        </div>
-      </div>
-    </div>
-    <div class="set-section">
-      <div class="set-section-title" data-i18n="set.keysTitle">键位设置</div>
-      <div class="set-note" data-i18n="set.kbdHint">点击键位框后按下新快捷键，Enter 保存，Esc 取消</div>
-      <div class="set-keys">
-        <div class="set-sub" data-i18n="set.mouseTitle">鼠标操作</div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.dblclick">生成新节点</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.dblclick" value="双击空白处"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.dragNode">移动节点</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.dragNode" value="左键拖拽"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.socket">创建连线</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.socket" value="拖拽边缘圆点"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.dblTitle">编辑文字</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.dblTitle" value="双击标题"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.ctxMenu">更多操作（复制 / 镜像 / 调整…）</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.ctxMenu" value="右键"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.box">框选多个节点</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.box" value="Shift + 拖拽"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.middle">平移画布（不会触发节点事件）</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.middle" value="中键拖拽 / 长按中键"></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.wheel">缩放画布 / 切换节点颜色</span><input class="help-key" type="text" readonly data-i18n-value="set.kv.wheel" value="滚轮 / Ctrl + 滚轮"></div>
-        <div class="set-sub" data-i18n="set.keyTitle">键盘快捷键</div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.undo">撤销</span><input class="help-key" type="text" data-kb="undo" value="Ctrl+Z" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.redo">重做</span><input class="help-key" type="text" data-kb="redo" value="Ctrl+Y" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.selectAll">全选</span><input class="help-key" type="text" data-kb="selectAll" value="Ctrl+A" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.copy">复制</span><input class="help-key" type="text" data-kb="copy" value="Ctrl+C" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.paste">粘贴</span><input class="help-key" type="text" data-kb="paste" value="Ctrl+V" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.autoModal">新建自动打开详情</span><input class="help-key" type="text" data-kb="autoModal" value="Ctrl+E" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.chrome">隐藏 / 显示界面</span><input class="help-key" type="text" data-kb="chrome" value="Ctrl+H" readonly></div>
-        <div class="key-row"><span class="key-desc" data-i18n="set.delKey">删除选中</span><input class="help-key" type="text" data-kb="delete" value="Delete" readonly></div>
-        <div class="set-reset"><button class="btn btn-secondary" id="btnResetKeybinds" data-i18n="set.resetKeys">重置键位</button></div>
       </div>
     </div>
     <div id="settingsBtns" class="modal-btns">
@@ -4457,6 +4469,15 @@ Object.assign(App, {
   showSettings() {
     document.getElementById('settingsModal').classList.add('on');
   },
+  //设置弹窗侧边导航切换（'general' | 'keys'）。
+  _showSettingsTab(tab) {
+    document.querySelectorAll('.settings-nav-item').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-settings-tab') === tab);
+    });
+    document.querySelectorAll('.settings-panel').forEach(panel => {
+      panel.style.display = panel.getAttribute('data-settings-panel') === tab ? '' : 'none';
+    });
+  },
   closeSettings() {
     document.getElementById('settingsModal').classList.remove('on');
     //首次启动的键位设置（设置弹窗）看过一次后不再自动弹出。
@@ -5379,9 +5400,14 @@ document.addEventListener('keydown', function(e) {
   });
   document.getElementById('btnShowSettings').addEventListener('click', () => App.showSettings());
   document.getElementById('btnCloseSettings').addEventListener('click', () => App.closeSettings());
+  /* 设置弹窗侧边导航 */
+  document.querySelectorAll('.settings-nav-item').forEach(btn => {
+    btn.addEventListener('click', () => App._showSettingsTab(btn.getAttribute('data-settings-tab')));
+  });
 
-  /* 首次启动：自动弹出设置弹窗（含键位设置；看过一次后不再弹出） */
+  /* 首次启动：自动弹出设置弹窗并定位到键位设置（看过一次后不再弹出） */
   if (!App._settings.getBool('helpSeen')) {
+    App._showSettingsTab('keys');
     App.showSettings();
   }
 
