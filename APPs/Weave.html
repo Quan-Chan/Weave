@@ -497,7 +497,7 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
           <div class="about-content">
             <div class="about-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.0</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.1</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -528,10 +528,10 @@ text-rendering: geometricPrecision 对标签文字做同样处理。*/
      M05 渲染·节点      —— 节点 DOM 创建/更新、renderCanvas 编排、z 序、溢出刷新
      M06 渲染·连线      —— 贝塞尔几何、箭头、SVG 渲染、空间索引、增量平移
      M07 动画           —— 网格吸附动画（240Hz 数据流 + rAF 渲染流）
-     M08 输入手势       —— 节点拖/线拖/框选/平移/滚轮/单击双击/键盘
-     M09 节点编辑       —— CRUD、剪贴板、内联编辑、描述浮层、详情弹窗
+     M08 输入手势       —— 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射
+     M09 节点编辑       —— CRUD、剪贴板、内联编辑、描述浮层、详情弹窗、上下文菜单动作
      M10 连线编辑       —— 创建/删除、曲线手柄、标签编辑、选择维护
-     M11 UI 外壳        —— 右键菜单、关于/设置弹窗、专注模式、状态徽标
+     M11 UI 外壳        —— 右键菜单、关于/设置弹窗、键位录制、专注模式、状态徽标
      M12 导入导出       —— JSON 导入导出、PNG 导出（DOM 快照 + legacy 双通道）
      M13 装配与启动     —— 全局事件监听、快捷键、Init 初始化
 
@@ -577,7 +577,6 @@ const PRESET_COLORS = [
 const COLORS = PRESET_COLORS.map(c => c.id);
 const COLOR_HEX = Object.fromEntries(PRESET_COLORS.map(c => [c.id, c.hex]));
 const LEGACY_COLOR_MAP = {amber:'yellow',rose:'orange',teal:'cyan',violet:'blue',default:'blue'};
-const COLOR_NAMES_CN = {blue:'蓝色',cyan:'青色',green:'绿色',yellow:'黄色',orange:'橙色'};
 const RE_HEX6 = /^#[0-9a-fA-F]{6}$/;
 
 //统一节点的默认尺寸：标准 8.5 × 4 个网格单元格（170×80）。
@@ -776,14 +775,122 @@ Weave.Util = {
     div.textContent = text;
     return div.innerHTML;
   },
-  debounce(fn, ms) { let t; return function(...a) { clearTimeout(t); const c=this; t=setTimeout(()=>fn.apply(c,a),ms); }; }
+  debounce(fn, ms) { let t; return function(...a) { clearTimeout(t); const c=this; t=setTimeout(()=>fn.apply(c,a),ms); }; },
+  clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },
+  svgEl(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    if (attrs) {
+      for (const key in attrs) {
+        if (attrs[key] !== undefined) el.setAttribute(key, attrs[key]);
+      }
+    }
+    return el;
+  },
+  //通用网格描线器：在 `step` 的世界间距处绘制垂直线和水平线
+  //位于世界矩形 [wL,wT]–[wR,wB] 之内。`toX/toY` 将世界坐标
+  //映射到绘制空间（CSS 像素、设备像素，或对
+  //已预平移的世界空间上下文使用恒等映射）。单一实现，供
+  //实时画布网格、导出快照网格及旧版重绘共用。
+  strokeGridLines(ctx, step, color, wL, wT, wR, wB, toX, toY) {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    for (let gx = Math.floor(wL / step) * step; gx <= wR; gx += step) {
+      const X = toX(gx);
+      if (X < 0) continue;
+      ctx.moveTo(X, 0); ctx.lineTo(X, toY(wB));
+    }
+    for (let gy = Math.floor(wT / step) * step; gy <= wB; gy += step) {
+      const Y = toY(gy);
+      if (Y < 0) continue;
+      ctx.moveTo(0, Y); ctx.lineTo(toX(wR), Y);
+    }
+    ctx.stroke();
+  },
+  //弹窗在节点矩形附近的定位：在节点下方居中显示，若下方
+  //空间不足则翻转到上方。由 descEdit 和悬停提示共用。
+  positionNearNode(rect, w, h) {
+    let left = rect.left + rect.width / 2 - w / 2;
+    let top = rect.bottom + 8;
+    if (left < 4) left = 4;
+    if (left + w > innerWidth - 4) left = innerWidth - 4 - w;
+    if (top + h > innerHeight) top = rect.top - h - 8;
+    if (top < 4) top = 4;
+    return { left, top };
+  },
+  roundedRectPath(ctx, x, y, w, h, r, flatBottom) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    if (flatBottom) {
+      ctx.lineTo(x + w, y + h);
+      ctx.lineTo(x, y + h);
+    } else {
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    }
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  },
+  truncateDescForExport(ctx, desc, maxWidth, maxLines) {
+    const linesLimit = maxLines || 2;
+    ctx.font = '11px Inter, sans-serif';
+    const rawLines = (desc || '').split('\n');
+    const visualLines = [];
+    let hasMore = false;
+    let vi = 0;
+    for (; vi < rawLines.length && visualLines.length < linesLimit; vi++) {
+      let line = rawLines[vi];
+      while (line.length > 0 && visualLines.length < linesLimit) {
+        let truncated = '';
+        for (let ci = 0; ci < line.length; ci++) {
+          const next = truncated + line[ci];
+          if (ctx.measureText(next).width > maxWidth) break;
+          truncated = next;
+        }
+        if (truncated.length === 0) truncated = line.slice(0, 1);
+        visualLines.push(truncated);
+        line = line.slice(truncated.length);
+        if (line.length > 0) hasMore = true;
+      }
+    }
+    if (vi < rawLines.length) hasMore = true;
+    return { lines: visualLines.slice(0, linesLimit), truncated: hasMore };
+  },
+  //一个实心的小型圆角箭头，箭头尖端位于 (x,y)，指向
+  //`angle` 方向（旋转方向即曲线切线方向）。
+  drawExportArrow(ctx, x, y, angle, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-7, 2.4);
+    ctx.quadraticCurveTo(-9, 0, -7, -2.4);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  },
+  arrayBufferToBase64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin);
+  }
 };
 Weave.Color = {
 
   /*── 颜色工具函数 ──*/
   hslToRgb(h, s, l) { s /= 100; l /= 100; const a = s * Math.min(l, 1 - l); const f = n => { const k = (n + h / 30) % 12; return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); }; return { r: Math.round(f(0) * 255), g: Math.round(f(8) * 255), b: Math.round(f(4) * 255) }; },
   rgbToHsl(r, g, b) { r /= 255; g /= 255; b /= 255; const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2; let h = 0, s = 0; if (max !== min) { const d = max - min; s = l > .5 ? d / (2 - max - min) : d / (max + min); switch (max) { case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break; case g: h = ((b - r) / d + 2) / 6; break; case b: h = ((r - g) / d + 4) / 6; break; } } return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) }; },
-  shadeColor(hex, amt) { let v = parseInt(hex.replace('#', ''), 16); let r = Math.max(0, Math.min(255, (v >> 16) + amt)), g = Math.max(0, Math.min(255, (v >> 8 & 0xff) + amt)), b = Math.max(0, Math.min(255, (v & 0xff) + amt)); return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1); },
+  shadeColor(hex, amt) { const { r, g, b } = this.hexToRgb(hex); return this.rgbToHex(Weave.Util.clamp(r + amt, 0, 255), Weave.Util.clamp(g + amt, 0, 255), Weave.Util.clamp(b + amt, 0, 255)); },
   hexToRgb(h) { const v = parseInt(h.replace('#', ''), 16); return { r: (v >> 16) & 0xff, g: (v >> 8) & 0xff, b: v & 0xff }; },
   rgbToHex(r, g, b) { return '#' + ((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1); }
 };
@@ -885,6 +992,183 @@ Weave.Geom = {
     return 'M' + (tipX * s) + ',' + (tipY * s) +
            ' L' + ((bx + px * halfW) * s) + ',' + ((by + py * halfW) * s) +
            ' L' + ((bx - px * halfW) * s) + ',' + ((by - py * halfW) * s) + 'Z';
+  },
+
+  /* ── 视图坐标换算 ──
+     worldToScreen / screenToWorld 是画布坐标的唯一事实来源
+     （screen = world × scale + pan）。导出、内联编辑、框选
+     与坐标 HUD 共用，避免各写一套导致符号漂移。 */
+  worldToScreen(wx, wy, panX, panY, scale) {
+    return { x: wx * scale + panX, y: wy * scale + panY };
+  },
+  screenToWorld(px, py, panX, panY, scale) {
+    return { x: (px - panX) / scale, y: (py - panY) / scale };
+  },
+  //框选矩形的规范 min/max 归一化（任意拖拽方向）。
+  boxRect(sx, sy, cx, cy) {
+    return {
+      lx: Math.min(sx, cx), ly: Math.min(sy, cy),
+      rx: Math.max(sx, cx), ry: Math.max(sy, cy)
+    };
+  },
+  //节点集合的包围盒（世界坐标）。`rectOf(n)` 返回节点的
+  //{x, y, w, h}——由调用方注入，避免本函数与 App 几何耦合。
+  nodesBBox(nodes, rectOf) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      const r = rectOf(n);
+      if (r.x < minX) minX = r.x;
+      if (r.x + r.w > maxX) maxX = r.x + r.w;
+      if (r.y < minY) minY = r.y;
+      if (r.y + r.h > maxY) maxY = r.y + r.h;
+    });
+    return { minX, maxX, minY, maxY };
+  },
+
+  /* ── 连线几何（从 App 提取的纯函数） ── */
+  getSocketAnchor(node, side) {
+    const w = node.w || NODE_W;
+    return {
+      x: (node.x || 0) + (side === 'out' ? (node.mirrored ? 0 : w) : (node.mirrored ? w : 0)),
+      y: (node.y || 0) + SOCKET_Y
+    };
+  },
+  //三次贝塞尔在 t=0.5 处的真实中点：B(0.5) = (P0+3P1+3P2+P3)/8，
+  //其中 P1=P0+c1，P2=P3+c2 → (P0+P3)/2 + 0.375·(c1+c2)。该 0.375 系数
+  //在两端出现（标签位置由它给出）。
+  connLabelPos(fromOut, toIn, cp) {
+    return {
+      x: (fromOut.x + toIn.x) / 2 + 0.375 * (cp.c1x + cp.c2x),
+      y: (fromOut.y + toIn.y) / 2 + 0.375 * (cp.c1y + cp.c2y)
+    };
+  },
+  //单个 socket 侧的箭头基本方向：节点镜像时为 −1（左），
+  //否则为 +1（右）。输出端箭头传入 SOURCE（源）节点，
+  //输入端箭头传入 DESTINATION（目标）节点——二者可能不同，
+  //因此绝不可为两端复用同一个值。
+  connArrowBaseX(node) { return node.mirrored ? -1 : 1; },
+  //从已计算好的控制点集合构建 SVG 路径字符串
+  //（不再重新派生自动点）。
+  buildPathFromCp(fromX, fromY, toX, toY, cp, scale) {
+    const s = scale || 1;
+    const x1 = fromX * s, y1 = fromY * s, x2 = toX * s, y2 = toY * s;
+    return 'M' + x1 + ',' + y1 +
+           ' C' + (x1 + cp.c1x * s) + ',' + (y1 + cp.c1y * s) +
+           ' ' + (x2 + cp.c2x * s) + ',' + (y2 + cp.c2y * s) +
+           ' ' + x2 + ',' + y2;
+  },
+  //自动（默认）控制点：沿水平方向延伸锚点距离的一半，
+  //节点镜像时翻转方向（socket 移到另一侧）。用户的
+  //cp1/cp2 存储相对这些自动点的差值（DELTAS），因此节点移动
+  //会重新派生自动基点，曲线随之跟随节点。`offY` 将平行连线
+  //在垂直方向扇出分开（见 CONN_OFFSET_STEP）。
+  getConnControlPoints(fromX, fromY, toX, toY, cp1, cp2, mirrored1, mirrored2, offY) {
+    const defaultDx = Math.abs(toX - fromX) * 0.5;
+    const autoC1x = mirrored1 ? -defaultDx : defaultDx;
+    const autoC1y = offY || 0;
+    const autoC2x = mirrored2 ? defaultDx : -defaultDx;
+    const autoC2y = offY || 0;
+    const c1x = cp1 ? autoC1x + cp1.dx : autoC1x;
+    const c1y = cp1 ? autoC1y + cp1.dy : autoC1y;
+    const c2x = cp2 ? autoC2x + cp2.dx : autoC2x;
+    const c2y = cp2 ? autoC2y + cp2.dy : autoC2y;
+    return { c1x, c1y, c2x, c2y };
+  },
+  //同一对节点之间平行连线的垂直扇出偏移。
+  //第 n 条连线（从 1 起）得到的偏移为：第 1 条 → 0（直的，位于
+  //中间），第 2 条 → −step（上方），第 3 条 → +step（下方），第 4 条 → −2·step
+  //（上方，更远），第 5 条 → +2·step（下方，更远），依此类推，交替
+  //两侧并不断增大距离。屏幕 y 向下增长，因此"上方"即
+  //负方向。
+  connOffYFromIdx(idx) {
+    if (idx === 0) return 0;
+    return (idx % 2 === 0 ? 1 : -1) * Math.ceil(idx / 2) * CONN_OFFSET_STEP;
+  },
+
+  /* ── 节点几何（唯一事实来源，M05 曾重复定义） ── */
+  getNodeSize(n) {
+    return {
+      w: n.w || NODE_DEFAULT_W,
+      h: n.h || NODE_DEFAULT_H
+    };
+  },
+  //统一的节点矩形访问器：每个几何/命中/导出路径都从此处派生
+  //节点的 {x,y,w,h} 默认值（唯一事实来源）。
+  getNodeRect(n) {
+    const { w, h } = this.getNodeSize(n);
+    return { x: n.x || 0, y: n.y || 0, w, h };
+  },
+  //描述文本可容纳的行数：由主体高度与 11px/1.35 排版推导。
+  getNodeClamp(h) {
+    return Math.max(1, Math.floor((h - 34 - 14) / (11 * 1.35)));
+  },
+
+  /* ── 连线箭头（沿线的分段向量驱动） ── */
+  //单个连线在缩放 `s` 下的完整箭头几何。函数接收 baseOutX
+  //（输出端，取自源节点）与 baseInX（输入端，取自目标节点）
+  //两个独立参数——两端镜像状态可能不同，必须分别传入。
+  connArrows(fromOut, toIn, cp, s, hex, baseOutX, baseInX) {
+    const GAP = 8.5, LEN = 9, HALF = 4.2;
+    const p0 = fromOut, p3 = toIn;
+    const p1 = { x: fromOut.x + cp.c1x, y: fromOut.y + cp.c1y };
+    const p2 = { x: toIn.x + cp.c2x, y: toIn.y + cp.c2y };
+    //只对曲线采样一次；所有锚点共用这条折线（这是
+    //文件中热度最高的数值路径——每条可见连线在每次渲染时
+    //都会重新计算它，因此对每个锚点分别重新采样约需 6 倍工作量）。
+    const pts = Weave.Geom.curveSamples(p0, p1, p2, p3);
+    // 整条曲线的总长度；每个锚点都限制在它的范围内，因此短线总是
+    // 产生真实的线上锚点（其远端）而不是 null。
+    const totalLen = Weave.Geom.curveLength(p0, p1, p2, p3, pts);
+    const mid = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, totalLen / 2, true, pts) || p0;
+    const oTipArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP + LEN, totalLen), true, pts);
+    const oBaseArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP, totalLen), true, pts);
+    const iTipArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP, totalLen), false, pts);
+    const iBaseArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP + LEN, totalLen), false, pts);
+    // 被切割片段的朝向（尖端 → 底端）。固定的底端永远不能
+    // 翻转：当该片段会让箭头指向相反一侧时，会
+    // 绕垂直轴镜像（REFLECTED），从而使箭头朝向往上/往下的
+    // 极限平滑翻转（180° 范围），而不是
+    // 生硬吸附。仅当片段退化为零长度时才返回 null。
+    const pieceDir = (tipArc, baseArc, baseX) => {
+      if (!tipArc || !baseArc) return null;
+      const dx = tipArc.x - baseArc.x, dy = tipArc.y - baseArc.y;
+      const L = Math.hypot(dx, dy);
+      if (L < 1e-6) return null;
+      const ux = dx / L;
+      return { x: ux * baseX < 0 ? -ux : ux, y: dy / L };
+    };
+    // 整条线回退向量（同样被限制），用于那些
+    // 塌缩为零长度的片段——此时箭头会跟随整条线。
+    const wholeDir = (baseX) => {
+      const dx = p3.x - p0.x, dy = p3.y - p0.y;
+      const L = Math.hypot(dx, dy);
+      if (L < 1e-6) return null;
+      const ux = dx / L;
+      return { x: ux * baseX < 0 ? -ux : ux, y: dy / L };
+    };
+    // 输出箭头：尖端为远端（FAR）的线上锚点（弧 GAP+LEN），箭身沿
+    // 线向后直至弧 GAP 锚点。输入箭头：尖端为近端（NEAR）
+    // 的线上锚点（距输入 socket 一个弧 GAP），箭身再向线后方
+    // 延伸。比箭头本身更短的线会将两个箭头都
+    // 折叠到曲线中点，并沿整条线的方向指。
+    const shortLine = totalLen < GAP;
+    const oDir = pieceDir(oTipArc, oBaseArc, baseOutX) || wholeDir(baseOutX);
+    const vOut = oDir || { x: baseOutX, y: 0 };
+    const oTip = shortLine ? mid : (oTipArc || mid);
+    const oBase = shortLine ? mid : (oBaseArc || mid);
+    const iDir = pieceDir(iTipArc, iBaseArc, baseInX) || wholeDir(baseInX);
+    const vIn = iDir || { x: baseInX, y: 0 };
+    const iTip = shortLine ? mid : (iTipArc || mid);
+    const iBase = shortLine ? mid : (iBaseArc || mid);
+    return {
+      dOut: Weave.Geom.arrowShapeD(oTip.x, oTip.y, vOut.x, vOut.y, LEN, HALF, s),
+      dIn: Weave.Geom.arrowShapeD(iTip.x, iTip.y, vIn.x, vIn.y, LEN, HALF, s),
+      outTipX: oTip.x, outTipY: oTip.y,
+      inTipX: iTip.x, inTipY: iTip.y,
+      vOut, vIn,
+      strokeW: Math.max(1.5 * s, 0.75),
+      hex
+    };
   }
 };
 
@@ -1108,16 +1392,7 @@ Object.assign(App, {
   //位置吸附：开启“对齐节点”时，吸附到 20px 网格（历史
   //行为）。关闭时，吸附到整像素——最小粒度为
   //1px，即序列化网格坐标系中一个网格单位的 1/20。
-  _snap(v) { return this._snapNodes ? Math.round(v / GRID) * GRID : Math.round(v); },
-  _svgEl(tag, attrs) {
-    const el = document.createElementNS(SVG_NS, tag);
-    if (attrs) {
-      for (const key in attrs) {
-        if (attrs[key] !== undefined) el.setAttribute(key, attrs[key]);
-      }
-    }
-    return el;
-  },
+  _snap(v, useGrid) { if (useGrid === undefined) useGrid = this._snapNodes; return useGrid ? Math.round(v / GRID) * GRID : Math.round(v); },
   //界面翻译：按当前语言取词典值，支持 {占位符} 替换；缺失时回退中文、再回退键名。
   t(key, params) {
     let s = (I18N[this._lang] || I18N.zh)[key];
@@ -1170,10 +1445,20 @@ Object.assign(App, {
   _lsSet(key, value) {
     try { localStorage.setItem(key, value); } catch (e) { /*忽略*/ }
   },
+  //localStorage 中的 JSON 读取（解析失败/缺失时返回 null）：
+  //初始化与自定义颜色加载共用，替代手写 try/JSON.parse 样板。
+  _lsGetJson(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw === null ? null : JSON.parse(raw);
+    } catch (e) { return null; }
+  },
   _getNodeMap() {
-    const m = new Map();
-    this.canvasState.nodes.forEach(n => m.set(n.id, n));
-    return m;
+    if (!this._nodeByIdCache) {
+      this._nodeByIdCache = new Map();
+      for (const n of this.canvasState.nodes) this._nodeByIdCache.set(n.id, n);
+    }
+    return this._nodeByIdCache;
   },
   //通过惰性构建的 id → node Map 实现 O(1) 节点查找；每次
   //数据变更都会使其失效（与 _connOffsCache 相同的失效），因此交互
@@ -1184,6 +1469,15 @@ Object.assign(App, {
       for (const n of this.canvasState.nodes) this._nodeByIdCache.set(n.id, n);
     }
     return this._nodeByIdCache.get(id);
+  },
+  //状态徽标（左下角 "N 节点 · M 连线"）——调用于切语言、
+  //渲染收尾与启动初始化。
+  _updateStatusBadge() {
+    const badge = this._getEl('statusBadge');
+    if (!badge) return;
+    const nc = this.canvasState.nodes.length;
+    const cc = this.canvasState.connections.length;
+    badge.textContent = this.t('misc.statusBadge', { nodes: nc, conns: cc });
   },
 
   /*── 撤销 / 保存 ──
@@ -1417,10 +1711,10 @@ Object.assign(App, {
   },
 
   _loadCustomColors() {
-    try { this._customColors = (JSON.parse(localStorage.getItem('flow_custom_colors')) || []).filter(c => RE_HEX6.test(c)); } catch(e) { console.warn('Failed to load custom colors:', e); this._customColors = []; }
+    this._customColors = (this._lsGetJson('flow_custom_colors') || []).filter(c => RE_HEX6.test(c));
   },
   _saveCustomColors() {
-    try { localStorage.setItem('flow_custom_colors', JSON.stringify(this._customColors)); } catch(e) { console.warn('Failed to save custom colors:', e); }
+    this._lsSet('flow_custom_colors', JSON.stringify(this._customColors));
   },
 
   _cycleNodeColors(dir) {
@@ -1575,9 +1869,9 @@ Object.assign(App, {
   },
   _cpFromRGB() {
     if (!this._cpEls) return;
-    const r = Math.max(0, Math.min(255, +this._cpEls.r.value || 0));
-    const g = Math.max(0, Math.min(255, +this._cpEls.g.value || 0));
-    const b = Math.max(0, Math.min(255, +this._cpEls.b.value || 0));
+    const r = Weave.Util.clamp(+this._cpEls.r.value || 0, 0, 255);
+    const g = Weave.Util.clamp(+this._cpEls.g.value || 0, 0, 255);
+    const b = Weave.Util.clamp(+this._cpEls.b.value || 0, 0, 255);
     const hsl = Weave.Color.rgbToHsl(r, g, b);
     const hex = Weave.Color.rgbToHex(r, g, b);
     this._cpState = { h: hsl.h, s: hsl.s, r, g, b, hex: hex };
@@ -1652,30 +1946,20 @@ Object.assign(App, {
     if (!c || c.clientWidth === 0) return { x: WORLD_CENTER_X, y: WORLD_CENTER_Y };
     return { x: (-this.panX + c.clientWidth / 2) / this.scale, y: (-this.panY + c.clientHeight / 2) / this.scale };
   },
-  //通用网格描线器：在 `step` 的世界间距处绘制垂直线和水平线
-  //位于世界矩形 [wL,wT]–[wR,wB] 之内。`toX/toY` 将世界坐标
-  //映射到绘制空间（CSS 像素、设备像素，或对
-  //已预平移的世界空间上下文使用恒等映射）。单一实现，供
-  //实时画布网格、导出快照网格及旧版重绘共用。
-  _strokeGridLines(ctx, step, color, wL, wT, wR, wB, toX, toY) {
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    for (let gx = Math.floor(wL / step) * step; gx <= wR; gx += step) {
-      const X = toX(gx);
-      if (X < 0) continue;
-      ctx.moveTo(X, 0); ctx.lineTo(X, toY(wB));
-    }
-    for (let gy = Math.floor(wT / step) * step; gy <= wB; gy += step) {
-      const Y = toY(gy);
-      if (Y < 0) continue;
-      ctx.moveTo(0, Y); ctx.lineTo(toX(wR), Y);
-    }
-    ctx.stroke();
-  },
+  //通用网格描线器（strokeGridLines）已下沉至 Weave.Util（M01）。
   _computeViewport() {
     const s = this.scale;
     const cw = this._cachedCW || 800, ch = this._cachedCH || 600;
     return { s, cw, ch, vpL: -this.panX / s, vpT: -this.panY / s, vpR: (-this.panX + cw) / s, vpB: (-this.panY + ch) / s };
+  },
+  //以视口内固定屏幕点 (fx, fy) 为锚缩放（锚点世界坐标保持不动）。
+  //推导：fx = wx·scale + panX → 新 panX = fx − wx·newScale。
+  //由坐标 HUD 百分比输入、滚轮缩放与缩放按钮共用。
+  _zoomAbout(fx, fy, newScale) {
+    const oldScale = this.scale;
+    this.scale = newScale;
+    this.panX = fx - ((fx - this.panX) / oldScale) * newScale;
+    this.panY = fy - ((fy - this.panY) / oldScale) * newScale;
   },
 
   /*── 视图变换 ──*/
@@ -1725,7 +2009,7 @@ Object.assign(App, {
   _drawGrid() {
     const container = this._getEl('canvasStage');
     if (!container) return;
-    const cvs = document.getElementById('gridCvs');
+    const cvs = this._getEl('gridCvs');
     if (!cvs) return;
 
     const dpr = window.devicePixelRatio || 1;
@@ -1749,31 +2033,32 @@ Object.assign(App, {
     const toY = wy => Math.round(wy * this.scale + this.panY) + 0.5;
 
     /*主要网格——始终可见*/
-    this._strokeGridLines(ctx, GRID * 5, GRID_MAJOR_COLOR, wL, wT, wR, wB, toX, toY);
+    Weave.Util.strokeGridLines(ctx, GRID * 5, GRID_MAJOR_COLOR, wL, wT, wR, wB, toX, toY);
 
     /*次要网格：仅当间距 ≥ 8px 时绘制，避免小缩放下产生视觉噪音*/
-    if (GRID * this.scale >= 8) this._strokeGridLines(ctx, GRID, GRID_MINOR_COLOR, wL, wT, wR, wB, toX, toY);
+    if (GRID * this.scale >= 8) Weave.Util.strokeGridLines(ctx, GRID, GRID_MINOR_COLOR, wL, wT, wR, wB, toX, toY);
   },
 
   updateCoordDisplay() {
     const c = this._getEl('canvasStage');
     if (!c) return;
-    const cx = Math.round((-this.panX + c.clientWidth / 2) / this.scale);
-    const cy = Math.round((-this.panY + c.clientHeight / 2) / this.scale);
+    const vc = this._viewportCenterWorld();
+    //先取整再除网格：与坐标显示的历史取整行为保持一致。
+    const cx = Math.round(vc.x), cy = Math.round(vc.y);
     const guX = Math.round(cx / GRID_PX), guY = Math.round(cy / GRID_PX);
     const zp = Math.round(this.scale * 100);
-    const elX = document.getElementById('coordX');
-    const elY = document.getElementById('coordY');
-    const elZ = document.getElementById('coordZ');
+    const elX = this._getEl('coordX');
+    const elY = this._getEl('coordY');
+    const elZ = this._getEl('coordZ');
     if (elX && document.activeElement !== elX) elX.textContent = guX;
     if (elY && document.activeElement !== elY) elY.textContent = guY;
     if (elZ && document.activeElement !== elZ) elZ.textContent = zp + '%';
   },
 
   _initCoordEditable() {
-    const elX = document.getElementById('coordX');
-    const elY = document.getElementById('coordY');
-    const elZ = document.getElementById('coordZ');
+    const elX = this._getEl('coordX');
+    const elY = this._getEl('coordY');
+    const elZ = this._getEl('coordZ');
     if (!elX || elX.dataset.coordBound) return;
     elX.dataset.coordBound = '1';
     const self = this;
@@ -1788,22 +2073,17 @@ Object.assign(App, {
       const c = self._getEl('canvasStage');
       if (!c) { restoreOriginal(field); return; }
       if (field === elX) {
-        const val = Math.min(5000, Math.max(-5000, v));
+        const val = Weave.Util.clamp(v, -5000, 5000);
         field.textContent = val;
         self.panX = c.clientWidth / 2 - val * GRID_PX * self.scale;
       } else if (field === elY) {
-        const val = Math.min(5000, Math.max(-5000, v));
+        const val = Weave.Util.clamp(v, -5000, 5000);
         field.textContent = val;
         self.panY = c.clientHeight / 2 - val * GRID_PX * self.scale;
       } else {
-        const val = Math.min(500, Math.max(15, v));
+        const val = Weave.Util.clamp(v, 15, 500);
         field.textContent = val + '%';
-        const newScale = val / 100;
-        const cxc = c.clientWidth / 2, cyc = c.clientHeight / 2;
-        const oldScale = self.scale;
-        self.scale = newScale;
-        self.panX = cxc - ((cxc - self.panX) / oldScale) * newScale;
-        self.panY = cyc - ((cyc - self.panY) / oldScale) * newScale;
+        self._zoomAbout(c.clientWidth / 2, c.clientHeight / 2, val / 100);
       }
       self.clampPan();
       self.applyViewTransform();
@@ -1829,7 +2109,7 @@ Object.assign(App, {
     });
 
     //与坐标（coord）交互时阻止画布平移
-    const coordEl = document.getElementById('coord');
+    const coordEl = this._getEl('coord');
     if (coordEl) {
       coordEl.addEventListener('mousedown', function(e) { e.stopPropagation(); });
     }
@@ -1848,20 +2128,16 @@ Object.assign(App, {
     const minX = cw > ws ? cw / 2 : cw - ws / 2;
     const maxY = ch > hs ? ch / 2 : hs / 2;
     const minY = ch > hs ? ch / 2 : ch - hs / 2;
-    this.panX = Math.min(maxX, Math.max(minX, this.panX));
-    this.panY = Math.min(maxY, Math.max(minY, this.panY));
+    this.panX = Weave.Util.clamp(this.panX, minX, maxX);
+    this.panY = Weave.Util.clamp(this.panY, minY, maxY);
   },
 
   centerCanvasOnNodes() {
     const c = this._getEl('canvasStage');
     if (!c || this.canvasState.nodes.length === 0) { this.centerCanvasOnOrigin(); return; }
     if (c.clientWidth === 0 || c.clientHeight === 0) { setTimeout(() => this.centerCanvasOnNodes(), 50); return; }
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    this.canvasState.nodes.forEach(n => {
-      const { x: nx, y: ny, w, h } = this._getNodeRect(n);
-      if (nx < minX) minX = nx; if (nx + w > maxX) maxX = nx + w;
-      if (ny < minY) minY = ny; if (ny + h > maxY) maxY = ny + h;
-    });
+    const bb = Weave.Geom.nodesBBox(this.canvasState.nodes, n => Weave.Geom.getNodeRect(n));
+    const minX = bb.minX, maxX = bb.maxX, minY = bb.minY, maxY = bb.maxY;
     const pad = 40, nodeW = maxX - minX, nodeH = maxY - minY;
     if (nodeW === 0 && nodeH === 0) {
       this.scale = 1;
@@ -1911,6 +2187,22 @@ Object.assign(App, {
       }
     }
     this._zOrderDirty = false;
+  },
+  //把给定节点置顶：立即重新追加 DOM 子元素，以便视觉叠放
+  //顺序现在就更新，而不是等下次 renderCanvas()。当顺序
+  //几乎不变时 appendChild 代价很低。
+  _bringToFront(nodeIds) {
+    if (!nodeIds || !nodeIds.length) return;
+    let zOrderChanged = false;
+    for (const n of nodeIds) {
+      const dIdx = this._nodeZOrder.indexOf(n);
+      if (dIdx >= 0) this._nodeZOrder.splice(dIdx, 1);
+      //检测节点的索引是否真的改变了；只在这时才重新追加
+      //DOM 叠放栈，以避免无意义的重排。
+      if (dIdx !== this._nodeZOrder.length) zOrderChanged = true;
+      this._nodeZOrder.push(n);
+    }
+    if (zOrderChanged) { this._zOrderDirty = true; this._applyZOrder(); }
   },
   _destroyNodeEls(ids) {
     for (const id of ids) {
@@ -2038,29 +2330,9 @@ Object.assign(App, {
     this._bindResizeHandles(nodeEl, nodeId);
   },
 
-  //统一的节点几何工具。所有节点尺寸/钳制逻辑都应
-  //走这些工具，使实时渲染、转换、重置、克隆和导入保持一致。
-  //保持一致。
-  _getNodeSize(n) {
-    return {
-      w: n.w || NODE_DEFAULT_W,
-      h: n.h || NODE_DEFAULT_H
-    };
-  },
-  //统一的节点矩形访问器：每个几何/命中/导出路径都从此处派生
-  //节点的 {x,y,w,h} 默认值（唯一事实来源）。
-  _getNodeRect(n) {
-    return {
-      x: n.x || 0,
-      y: n.y || 0,
-      w: n.w || NODE_DEFAULT_W,
-      h: n.h || NODE_DEFAULT_H
-    };
-  },
-  _getNodeClamp(h) {
-    return Math.max(1, Math.floor((h - 34 - 14) / (11 * 1.35)));
-  },
-
+//统一的节点几何工具（getNodeSize / getNodeRect / getNodeClamp）
+  //已下沉至 Weave.Geom（M01）——所有节点尺寸/钳制逻辑都应走
+  //这些工具，使实时渲染、转换、重置、克隆和导入保持一致。
   //将节点 w/h 镜像到 DOM：尺寸 + 描述行的 line-clamp（行数
   //由主体（body）高度推导，使省略号位于文本末尾）。
   //行高 = 11px × 1.35 = 14.85px（普通节点的排版，
@@ -2069,10 +2341,10 @@ Object.assign(App, {
   //对称的——与普通节点在其 44px 主体中 2 行的模型相同）。
   //在默认 170×80 下：(80−34−14)/14.85 = 2 行。
   _applyNodeSize(nodeEl, n) {
-    const { w, h } = this._getNodeSize(n);
+    const { w, h } = Weave.Geom.getNodeSize(n);
     nodeEl.style.width = w + 'px';
     nodeEl.style.height = h + 'px';
-    const clamp = this._getNodeClamp(h);
+    const clamp = Weave.Geom.getNodeClamp(h);
     if (nodeEl._val) nodeEl._val.style.setProperty('--clamp', String(clamp));
   },
 
@@ -2143,11 +2415,23 @@ Object.assign(App, {
   //直到下次交互为止。
   _refreshOverflowFlags() {
     this._nodeElMap.forEach(el => {
-      const val = el.querySelector('.node-val');
+      const val = el._val;
       const body = val ? val.closest('.node-body') : null;
       if (!body || !val) return;
       body.classList.toggle('has-overflow', val.scrollHeight > val.clientHeight + 1 && !val.isContentEditable);
     });
+  },
+
+  //取消给定元素上任何进行中的吸附动画（见 M02 的
+  //_activeSnapAnims 说明）。该函数返回后，el._snapAnim 为 null，
+  //且元素的 transform / node.x/y 保证同步（动画在每一帧都同时
+  //写入这两者，因此当前设置的所有值都彼此一致）。
+  _cancelSnapAnim(el) {
+    if (!el._snapAnim) return;
+    const anim = el._snapAnim;
+    anim.cancelled = true;
+    this._activeSnapAnims.delete(anim);
+    el._snapAnim = null;
   },
 
   renderCanvas({ center = false } = {}) {
@@ -2172,27 +2456,17 @@ Object.assign(App, {
   //内联编辑器都从这单一工具派生曲线，因此
   //各路径绝不会相互偏离。
   _getConnGeometry(conn, fromNode, toNode) {
-    const fromOut = this._getSocketAnchor(fromNode, 'out');
-    const toIn = this._getSocketAnchor(toNode, 'in');
-    const cp = this._getConnControlPoints(fromOut.x, fromOut.y, toIn.x, toIn.y, conn.cp1, conn.cp2, !!fromNode.mirrored, !!toNode.mirrored, this._getConnOffY(conn));
+    const fromOut = Weave.Geom.getSocketAnchor(fromNode, 'out');
+    const toIn = Weave.Geom.getSocketAnchor(toNode, 'in');
+    const cp = Weave.Geom.getConnControlPoints(fromOut.x, fromOut.y, toIn.x, toIn.y, conn.cp1, conn.cp2, !!fromNode.mirrored, !!toNode.mirrored, this._getConnOffY(conn));
     return { fromOut, toIn, cp };
-  },
-  //从已计算好的控制点集合构建 SVG 路径字符串
-  //（不再重新派生自动点）。
-  _buildPathFromCp(fromX, fromY, toX, toY, cp, scale) {
-    const s = scale || 1;
-    const x1 = fromX * s, y1 = fromY * s, x2 = toX * s, y2 = toY * s;
-    return 'M' + x1 + ',' + y1 +
-           ' C' + (x1 + cp.c1x * s) + ',' + (y1 + cp.c1y * s) +
-           ' ' + (x2 + cp.c2x * s) + ',' + (y2 + cp.c2y * s) +
-           ' ' + x2 + ',' + y2;
   },
   //实时渲染与 PNG 快照重建共用的连线几何：
   //两种媒介都需要完全相同的路径/颜色/标签计算。返回
   //同时返回控制点（`cp`），使标签/箭头复用相同的几何。
   _buildLinePath(conn, fromNode, toNode, s) {
     const g = this._getConnGeometry(conn, fromNode, toNode);
-    const d = this._buildPathFromCp(g.fromOut.x, g.fromOut.y, g.toIn.x, g.toIn.y, g.cp, s);
+    const d = Weave.Geom.buildPathFromCp(g.fromOut.x, g.fromOut.y, g.toIn.x, g.toIn.y, g.cp, s);
     const rc = this._resolveColor(fromNode.color);
     return {
       d, fromOut: g.fromOut, toIn: g.toIn, cp: g.cp,
@@ -2200,30 +2474,18 @@ Object.assign(App, {
       pathStyle: rc.isPreset ? '' : 'stroke:' + rc.hex
     };
   },
-  //单个 socket 侧的箭头基本方向：节点镜像时为 −1（左），
-  //否则为 +1（右）。输出端箭头传入 SOURCE（源）节点，
-  //输入端箭头传入 DESTINATION（目标）节点——二者可能不同，
-  //因此绝不可为两端复用同一个值。
-  _connArrowBaseX(node) { return node.mirrored ? -1 : 1; },
-  //三次贝塞尔在 t=0.5 处的真实中点：B(0.5) = (P0+3P1+3P2+P3)/8，
-  //其中 P1=P0+c1，P2=P3+c2 → (P0+P3)/2 + 0.375·(c1+c2)。该 0.375 系数
-  //由实时标签、导出标签和内联边编辑器共用。
-  _connLabelPos(fromOut, toIn, cp) {
-    return {
-      x: (fromOut.x + toIn.x) / 2 + 0.375 * (cp.c1x + cp.c2x),
-      y: (fromOut.y + toIn.y) / 2 + 0.375 * (cp.c1y + cp.c2y)
-    };
-  },
+  //单个 socket 侧的箭头基本方向、标签中点与完整箭头几何
+  //（connArrowBaseX / connLabelPos / connArrows）已下沉至 Weave.Geom（M01）。
   //SVG 图层栈（conn-group → 连线条 + 标签）及其常驻 DOM
   //映射和组级继承属性。由完整连线
   //渲染器和增量平移渲染器（可能先执行）共用。
   _ensureSvgLayers(svg) {
     let connGroup = svg.querySelector('.conn-group:not(.temp)');
-    if (!connGroup) { connGroup = this._svgEl('g', { class: 'conn-group' }); svg.appendChild(connGroup); }
+    if (!connGroup) { connGroup = Weave.Util.svgEl('g', { class: 'conn-group' }); svg.appendChild(connGroup); }
     let linesGroup = connGroup.querySelector('.lines');
-    if (!linesGroup) { linesGroup = this._svgEl('g', { class: 'lines' }); connGroup.appendChild(linesGroup); }
+    if (!linesGroup) { linesGroup = Weave.Util.svgEl('g', { class: 'lines' }); connGroup.appendChild(linesGroup); }
     let labelsGroup = connGroup.querySelector('.labels');
-    if (!labelsGroup) { labelsGroup = this._svgEl('g', { class: 'labels' }); connGroup.appendChild(labelsGroup); }
+    if (!labelsGroup) { labelsGroup = Weave.Util.svgEl('g', { class: 'labels' }); connGroup.appendChild(labelsGroup); }
     //这些映射必须在此初始化，否则 _renderConnection 的 .get()
     //会抛出异常——增量平移渲染器可能在任一次完整
     //_doRenderLines 填充它们之前就运行。
@@ -2236,114 +2498,8 @@ Object.assign(App, {
     return { connGroup, linesGroup, labelsGroup };
   },
 
-  // ── 连接点锚定与连线几何 ── 
-  _getSocketAnchor(node, side) {
-    const w = node.w || NODE_W;
-    return {
-      x: (node.x || 0) + (side === 'out' ? (node.mirrored ? 0 : w) : (node.mirrored ? w : 0)),
-      y: (node.y || 0) + SOCKET_Y
-    };
-  },
-
-  //默认控制点沿水平方向延伸锚点距离的一半，
-  //节点镜像时翻转方向（socket 移到另一
-  //侧）。用户的 cp1/cp2 存储相对这些自动点的差值（DELTAS），因此
-  //节点移动会重新派生自动基点，曲线随之跟随节点。
-  //`offY` 将平行连线在垂直方向扇出分开（见 CONN_OFFSET_STEP）：
-  //两个自动控制点都按其偏移，使曲线弓起，同时保持
-  //端点仍在其 socket 上。
-  _getConnControlPoints(fromX, fromY, toX, toY, cp1, cp2, mirrored1, mirrored2, offY) {
-    const defaultDx = Math.abs(toX - fromX) * 0.5;
-    const autoC1x = mirrored1 ? -defaultDx : defaultDx;
-    const autoC1y = offY || 0;
-    const autoC2x = mirrored2 ? defaultDx : -defaultDx;
-    const autoC2y = offY || 0;
-    const c1x = cp1 ? autoC1x + cp1.dx : autoC1x;
-    const c1y = cp1 ? autoC1y + cp1.dy : autoC1y;
-    const c2x = cp2 ? autoC2x + cp2.dx : autoC2x;
-    const c2y = cp2 ? autoC2y + cp2.dy : autoC2y;
-    return { c1x, c1y, c2x, c2y };
-  },
-  //单个连线在缩放 `s` 下的完整箭头几何。
-  //箭头基本方向按两个端点各自的镜像状态决定：
-  //  baseX = +1（始终指向右）  用于未镜像的端点
-  //  baseX = −1（始终指向左）  用于已镜像的端点
-  //函数接收 baseOutX（输出端，取自源节点）与 baseInX
-  //（输入端，取自目标节点）两个独立参数——两端镜像状态
-  //可能不同，必须分别传入，不可跨端复用同一个值。剪切片段
-  //向量只能在 180° 范围内倾斜箭头（从指向下
-  //转向指向上）：当片段会使箭头翻转时，将它关于垂直轴对称反射，
-  //从而箭头流畅地翻转（绝不
-  //跳变），并且绝不指向与基本方向相反。
-  //摆放：箭头锚定在线条自身——尖端和基部是
-  //曲线上按弧长从线条头部/尾部测量的点
-  //（即 socket 处），因此箭头始终位于线上，绝不会浮在
-  //其旁。短线条将锚点钳制到整条曲线（规格：“cut all of”
-  //it”）；当线条比箭头本身还短时，两端箭头
-  //都收拢到曲线中点，并沿整条线的向量方向。
-  _connArrows(fromOut, toIn, cp, s, hex, baseOutX, baseInX) {
-    const GAP = 8.5, LEN = 9, HALF = 4.2;
-    const p0 = fromOut, p3 = toIn;
-    const p1 = { x: fromOut.x + cp.c1x, y: fromOut.y + cp.c1y };
-    const p2 = { x: toIn.x + cp.c2x, y: toIn.y + cp.c2y };
-    //只对曲线采样一次；所有锚点共用这条折线（这是
-    //文件中热度最高的数值路径——每条可见连线在每次渲染时
-    //都会重新计算它，因此对每个锚点分别重新采样约需 6 倍工作量）。
-    const pts = Weave.Geom.curveSamples(p0, p1, p2, p3);
-    // 整条曲线的总长度；每个锚点都限制在它的范围内，因此短线总是
-    // 产生真实的线上锚点（其远端）而不是 null。
-    const totalLen = Weave.Geom.curveLength(p0, p1, p2, p3, pts);
-    const mid = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, totalLen / 2, true, pts) || p0;
-    const oTipArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP + LEN, totalLen), true, pts);
-    const oBaseArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP, totalLen), true, pts);
-    const iTipArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP, totalLen), false, pts);
-    const iBaseArc = Weave.Geom.curvePointAtArc(p0, p1, p2, p3, Math.min(GAP + LEN, totalLen), false, pts);
-    // 被切割片段的朝向（尖端 → 底端）。固定的底端永远不能
-    // 翻转：当该片段会让箭头指向相反一侧时，会
-    // 绕垂直轴镜像（REFLECTED），从而使箭头朝向往上/往下的
-    // 极限平滑翻转（180° 范围），而不是
-    // 生硬吸附。仅当片段退化为零长度时才返回 null。
-    const pieceDir = (tipArc, baseArc, baseX) => {
-      if (!tipArc || !baseArc) return null;
-      const dx = tipArc.x - baseArc.x, dy = tipArc.y - baseArc.y;
-      const L = Math.hypot(dx, dy);
-      if (L < 1e-6) return null;
-      const ux = dx / L;
-      return { x: ux * baseX < 0 ? -ux : ux, y: dy / L };
-    };
-    // 整条线回退向量（同样被限制），用于那些
-    // 塌缩为零长度的片段——此时箭头会跟随整条线。
-    const wholeDir = (baseX) => {
-      const dx = p3.x - p0.x, dy = p3.y - p0.y;
-      const L = Math.hypot(dx, dy);
-      if (L < 1e-6) return null;
-      const ux = dx / L;
-      return { x: ux * baseX < 0 ? -ux : ux, y: dy / L };
-    };
-    // 输出箭头：尖端为远端（FAR）的线上锚点（弧 GAP+LEN），箭身沿
-    // 线向后直至弧 GAP 锚点。输入箭头：尖端为近端（NEAR）
-    // 的线上锚点（距输入 socket 一个弧 GAP），箭身再向线后方
-    // 延伸。比箭头本身更短的线会将两个箭头都
-    // 折叠到曲线中点，并沿整条线的方向指。
-    const shortLine = totalLen < GAP;
-    const oDir = pieceDir(oTipArc, oBaseArc, baseOutX) || wholeDir(baseOutX);
-    const vOut = oDir || { x: baseOutX, y: 0 };
-    const oTip = shortLine ? mid : (oTipArc || mid);
-    const oBase = shortLine ? mid : (oBaseArc || mid);
-    const iDir = pieceDir(iTipArc, iBaseArc, baseInX) || wholeDir(baseInX);
-    const vIn = iDir || { x: baseInX, y: 0 };
-    const iTip = shortLine ? mid : (iTipArc || mid);
-    const iBase = shortLine ? mid : (iBaseArc || mid);
-    return {
-      dOut: Weave.Geom.arrowShapeD(oTip.x, oTip.y, vOut.x, vOut.y, LEN, HALF, s),
-      dIn: Weave.Geom.arrowShapeD(iTip.x, iTip.y, vIn.x, vIn.y, LEN, HALF, s),
-      outTipX: oTip.x, outTipY: oTip.y,
-      inTipX: iTip.x, inTipY: iTip.y,
-      vOut, vIn,
-      strokeW: Math.max(1.5 * s, 0.75),
-      hex
-    };
-  },
+  //连接点锚定、自动控制点与完整箭头几何（getSocketAnchor /
+  //getConnControlPoints / connArrows）已下沉至 Weave.Geom（M01）。
 
   // ── 渲染连线 ── 
   renderLines(filterNodeIds) {
@@ -2388,12 +2544,12 @@ Object.assign(App, {
   },
 
   _doRenderLines() {
-    const svg = document.getElementById('linesSvg');
+    const svg = this._getEl('linesSvg');
     if (!svg) return;
     if (!svg.getAttribute('width')) { svg.setAttribute('width', '1'); svg.setAttribute('height', '1'); }
     /*将缩放值以 CSS 变量的形式传播，使 stroke-width 始终保持按比例*/
     svg.style.setProperty('--line-scale', this.scale);
-    const curveOverlay = document.getElementById('curveOverlay');
+    const curveOverlay = this._getEl('curveOverlay');
     if (curveOverlay) curveOverlay.style.setProperty('--line-scale', this.scale);
 
     // ── 数据驱动的连线渲染 ── 
@@ -2484,11 +2640,12 @@ Object.assign(App, {
   // 像镜像输出一样向左倾斜——否则预览会绕
   // 错误的方向打转。
   _renderTempLine(svg) {
-    const existingTemp = svg.querySelector('.conn-group.temp');
-    if (existingTemp) existingTemp.remove();
+    //复用的临时组引用：避免每次 mousemove 都执行一次
+    //querySelector('.conn-group.temp')（拖拽中最热的路径之一）。
+    if (this._tempConnGroup) { this._tempConnGroup.remove(); this._tempConnGroup = null; }
     if (!this.socketDragState) return;
     const sd = this.socketDragState;
-    const realAnchor = this._getSocketAnchor(sd.node, sd.dir);
+    const realAnchor = Weave.Geom.getSocketAnchor(sd.node, sd.dir);
     const cursor = { x: sd.toWorldX, y: sd.toWorldY };
     // 角色分配：向外拖拽把真实节点放在输出端
     // （光标 = 虚拟输入）；向内拖拽把光标放在输出
@@ -2499,29 +2656,30 @@ Object.assign(App, {
     // 与真实节点同构）。
     const mirrored1 = !!sd.node.mirrored;
     const mirrored2 = !!sd.node.mirrored;
-    const cp = this._getConnControlPoints(fromOut.x, fromOut.y, toIn.x, toIn.y, null, null, mirrored1, mirrored2);
-    const d = this._buildPathFromCp(fromOut.x, fromOut.y, toIn.x, toIn.y, cp, this.scale);
-    const tempGroup = this._svgEl('g', { class: 'conn-group temp' });
-    const isPreset = COLORS.includes(sd.colorClass) || LEGACY_COLOR_MAP[sd.colorClass];
-    const tempLine = this._svgEl('path', { d: d, class: 'line temp' + (isPreset ? ' s-' + sd.colorClass : '') });
+    const cp = Weave.Geom.getConnControlPoints(fromOut.x, fromOut.y, toIn.x, toIn.y, null, null, mirrored1, mirrored2);
+    const d = Weave.Geom.buildPathFromCp(fromOut.x, fromOut.y, toIn.x, toIn.y, cp, this.scale);
+    const tempGroup = Weave.Util.svgEl('g', { class: 'conn-group temp' });
+    //颜色链复用 _resolveColor（与永久连线同一实现）。
+    const rc = this._resolveColor(sd.colorClass);
+    const tempLine = Weave.Util.svgEl('path', { d: d, class: 'line temp' + (rc.isPreset ? ' s-' + rc.cls : '') });
     tempLine.style.pointerEvents = 'none';
-    if (!isPreset) tempLine.setAttribute('style', 'stroke:' + sd.colorClass);
+    if (!rc.isPreset) tempLine.setAttribute('style', 'stroke:' + rc.hex);
     tempGroup.appendChild(tempLine);
     // 箭头遵循与永久连线相同的规则：当输出端节点被镜像时
     // baseX = −1（左），否则为 +1（右）。
     // 在同构假设下，虚拟输出镜像真实节点，因此
     // 两个拖拽方向共享同一个 baseX。方向从不跟随
     // 光标。
-    const hex = isPreset ? COLOR_HEX[LEGACY_COLOR_MAP[sd.colorClass] || sd.colorClass]
-                         : (RE_HEX6.test(sd.colorClass) ? sd.colorClass : COLOR_HEX.blue);
-    const baseX = this._connArrowBaseX(sd.node);
-    const ar = this._connArrows(fromOut, toIn, cp, this.scale, hex, baseX, baseX);
+    const hex = rc.hex;
+    const baseX = Weave.Geom.connArrowBaseX(sd.node);
+    const ar = Weave.Geom.connArrows(fromOut, toIn, cp, this.scale, hex, baseX, baseX);
     const arrowStyle = 'stroke-width:' + ar.strokeW + ';stroke:' + hex;
-    const a1 = this._svgEl('path', { class: 'conn-arrow', d: ar.dOut, fill: hex, style: arrowStyle });
-    const a2 = this._svgEl('path', { class: 'conn-arrow', d: ar.dIn, fill: hex, style: arrowStyle });
+    const a1 = Weave.Util.svgEl('path', { class: 'conn-arrow', d: ar.dOut, fill: hex, style: arrowStyle });
+    const a2 = Weave.Util.svgEl('path', { class: 'conn-arrow', d: ar.dIn, fill: hex, style: arrowStyle });
     tempGroup.appendChild(a1);
     tempGroup.appendChild(a2);
     svg.appendChild(tempGroup);
+    this._tempConnGroup = tempGroup;
   },
 
   // 为 `key` 获取或创建一个持久化元素：这些映射对每个 key 恰好保存一个
@@ -2550,7 +2708,7 @@ Object.assign(App, {
     // - 命中路径（hit-path）：透明粗线 Math.max(15×scale, 8px)，pointer-events=stroke，负责交互
     //   粗细继承自父级 <g> 的 strokeWidth
     const path = this._reconcileEl(this._visPathByKey, k, () => {
-      const el = this._svgEl('path', { 'data-conn-key': k, d: geo.d, class: pathCls });
+      const el = Weave.Util.svgEl('path', { 'data-conn-key': k, d: geo.d, class: pathCls });
       if (geo.pathStyle) el.setAttribute('style', geo.pathStyle);
       linesGroup.appendChild(el);
       return el;
@@ -2561,7 +2719,7 @@ Object.assign(App, {
     path.style.pointerEvents = 'none';
 
     const hitPath = this._reconcileEl(this._hitPathByKey, k, () => {
-      const el = this._svgEl('path', {
+      const el = Weave.Util.svgEl('path', {
         'data-conn-key': k, d: geo.d, class: 'hit-path', fill: 'none',
         stroke: 'transparent', 'pointer-events': 'stroke', opacity: '0'
       });
@@ -2573,10 +2731,10 @@ Object.assign(App, {
     hitPath.setAttribute('d', geo.d);
 
     // 标签位于实际三次贝塞尔曲线中点（t=0.5），跟随曲线控制点
-    const mp = this._connLabelPos(geo.fromOut, geo.toIn, geo.cp);
+    const mp = Weave.Geom.connLabelPos(geo.fromOut, geo.toIn, geo.cp);
     if (conn.label) {
       const lbl = this._reconcileEl(this._labelByKey, k, () => {
-        const el = this._svgEl('text', {
+        const el = Weave.Util.svgEl('text', {
           'data-ck': k, 'text-anchor': 'middle', 'font-style': 'italic',
           'dominant-baseline': 'middle', class: 'line-label', fill: '#4a5568'
         });
@@ -2598,11 +2756,11 @@ Object.assign(App, {
     // 一侧由目标节点的 mirror 状态决定。此前用
     // 源节点的 mirror 状态来同时决定两端：每当两个节点
     // 的 mirror 状态不同，输入箭头就会被翻转。
-    const ar = this._connArrows(geo.fromOut, geo.toIn, geo.cp, s, this._resolveColor(fromNode.color).hex,
-      this._connArrowBaseX(fromNode), this._connArrowBaseX(toNode));
+    const ar = Weave.Geom.connArrows(geo.fromOut, geo.toIn, geo.cp, s, this._resolveColor(fromNode.color).hex,
+      Weave.Geom.connArrowBaseX(fromNode), Weave.Geom.connArrowBaseX(toNode));
     const arr = this._reconcileEl(this._arrowPathByKey, k, () => {
-      const a = [this._svgEl('path', { 'data-conn-key': k, class: 'conn-arrow' }),
-                 this._svgEl('path', { 'data-conn-key': k, class: 'conn-arrow' })];
+      const a = [Weave.Util.svgEl('path', { 'data-conn-key': k, class: 'conn-arrow' }),
+                 Weave.Util.svgEl('path', { 'data-conn-key': k, class: 'conn-arrow' })];
       linesGroup.appendChild(a[0]);
       linesGroup.appendChild(a[1]);
       return a;
@@ -2736,7 +2894,7 @@ Object.assign(App, {
     }
 
     // 渲染：确保可见单元格的连线已存在于 DOM
-    const svg = document.getElementById('linesSvg');
+    const svg = this._getEl('linesSvg');
     if (svg) {
       const { linesGroup, labelsGroup } = this._ensureSvgLayers(svg);
       const connKeys = this._getCellConnections(visibleCells);
@@ -2890,7 +3048,7 @@ Object.assign(App, {
   // node.x/y（不碰 DOM），并为渲染流标记脏数据。移除
   // 已完成的动画，并在集合为空时自停。
   _snapDataTick: function () {
-    const self = window.App;
+    const self = App;
     if (self._activeSnapAnims.size === 0) {
       clearInterval(self._snapDataInterval);
       self._snapDataInterval = null;
@@ -2934,7 +3092,7 @@ Object.assign(App, {
   //多次更新合并成一次 renderLines()，让连线随之更新。本函数不会推进
   //动画——那是数据流的职责。
   _snapRenderTick: function () {
-    const self = window.App;
+    const self = App;
     self._snapRenderRaf = null;
 
     let anyDirty = false;
@@ -2958,37 +3116,15 @@ Object.assign(App, {
     //只要还有活动动画，就保持渲染流运行；
     //等全部完成后再停止它（如同数据流所做的那样）。
     if (self._activeSnapAnims.size > 0) self._snapRenderRaf = requestAnimationFrame(self._snapRenderTick);
-  },
-
-  //取消给定元素上任何进行中的吸附动画。
-  //该函数返回后，el._snapAnim 为 null，且元素的 transform /
-  //node.x/y 保证同步（动画在每一帧都同时写入这两者，
-  //因此当前设置的所有值都彼此
-  //一致）。
-  _cancelSnapAnim(el) {
-    if (!el._snapAnim) return;
-    const anim = el._snapAnim;
-    anim.cancelled = true;
-    this._activeSnapAnims.delete(anim);
-    el._snapAnim = null;
   }
 });
 
 /* ══ M08 · 输入手势 ───────────────────────────────────────────────────
-   职责: 节点拖/线拖/框选/平移/滚轮/单击双击/键盘
+   职责: 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射
    依赖: M02, M04
    ────────────────────────────────────────────────────────────────── */
 
 Object.assign(App, {
-  // 只读调试辅助：返回当前活动手势名（按优先级；仅供阅读，不参与互斥逻辑）。
-  _activeGesture() {
-    if (this._curveEditState) return 'curve-edit';
-    if (this.socketDragState) return 'socket-drag';
-    if (this.dragState) return 'node-drag';
-    if (this.canvasBoxState) return 'box-select';
-    if (this.canvasPanState) return 'canvas-pan';
-    return null;
-  },
   //统一的文档级拖拽手势绑定器：在 document 上绑定 mousemove/mouseup，
   //并以 window 的 blur 事件作为回退（在窗口外释放会结束
   //手势，而不是泄漏监听器）。返回一个清理函数。
@@ -3010,8 +3146,9 @@ Object.assign(App, {
       e.preventDefault();
       if (this.canvasBoxState) { this.finalizeBoxSelect(); return; }
       const wp = this.getWorldPos(e.clientX, e.clientY);
-      this.canvasBoxState = { startX: wp.x, startY: wp.y, curX: wp.x, curY: wp.y };
-      document.getElementById('boxSelectOverlay').style.display = 'block';
+      const rect = container.getBoundingClientRect();
+      this.canvasBoxState = { startX: wp.x, startY: wp.y, curX: wp.x, curY: wp.y, rect };
+      this._getEl('boxSelectOverlay').style.display = 'block';
     } else if (e.button === 0 || e.button === 1) {
       //在画布空白处左键拖拽可平移视图；中键也可平移
       //（preventDefault 阻止了浏览器的自动滚动）。左键还会
@@ -3026,13 +3163,11 @@ Object.assign(App, {
 
   finalizeBoxSelect() {
     if (!this.canvasBoxState) return;
-    const lx = Math.min(this.canvasBoxState.startX, this.canvasBoxState.curX);
-    const ly = Math.min(this.canvasBoxState.startY, this.canvasBoxState.curY);
-    const rx = Math.max(this.canvasBoxState.startX, this.canvasBoxState.curX);
-    const ry = Math.max(this.canvasBoxState.startY, this.canvasBoxState.curY);
+    const box = Weave.Geom.boxRect(this.canvasBoxState.startX, this.canvasBoxState.startY, this.canvasBoxState.curX, this.canvasBoxState.curY);
+    const lx = box.lx, ly = box.ly, rx = box.rx, ry = box.ry;
     this.selectedNodeIds.clear();
     this.canvasState.nodes.forEach(n => {
-      const { x: nx, y: ny, w, h } = this._getNodeRect(n);
+      const { x: nx, y: ny, w, h } = Weave.Geom.getNodeRect(n);
       if (nx + w >= lx && nx <= rx && ny + h >= ly && ny <= ry) this.selectedNodeIds.add(n.id);
     });
     //框选还会选中所有曲线与选框相交的连线——
@@ -3058,7 +3193,7 @@ Object.assign(App, {
       }
     });
     this.canvasBoxState = null;
-    const overlay = document.getElementById('boxSelectOverlay');
+    const overlay = this._getEl('boxSelectOverlay');
     if (overlay) overlay.style.display = 'none';
     this._boxSelectJustCompleted = true;
     this.renderCanvas({ center: false });
@@ -3084,13 +3219,7 @@ Object.assign(App, {
     const container = this._getEl('canvasStage');
     const rect = container.getBoundingClientRect();
     const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
-    const oldScale = this.scale;
-    const delta = e.deltaY > 0 ? 0.95 : 1.05;
-    this.scale = Math.min(5, Math.max(0.15, this.scale * delta));
-    const worldMouseX = (mouseX - this.panX) / oldScale;
-    const worldMouseY = (mouseY - this.panY) / oldScale;
-    this.panX = mouseX - worldMouseX * this.scale;
-    this.panY = mouseY - worldMouseY * this.scale;
+    this._zoomAbout(mouseX, mouseY, Weave.Util.clamp(this.scale * (e.deltaY > 0 ? 0.95 : 1.05), 0.15, 5));
     this._refreshContainerCache();
     this.clampPan();
     if (this.canvasPanState) {
@@ -3155,7 +3284,7 @@ Object.assign(App, {
         if (!n) return;
         const wp = self.getWorldPos(e.clientX, e.clientY);
         const dir = h.dataset.dir || 'se';
-        const size = self._getNodeSize(n);
+        const size = Weave.Geom.getNodeSize(n);
         const start = { w: size.w, h: size.h, x: n.x, y: n.y, sx: wp.x, sy: wp.y };
         let moved = false;
         const onMove = ev => {
@@ -3168,8 +3297,7 @@ Object.assign(App, {
           if (dir.indexOf('n') >= 0) h = start.h - dy;
           //"节点大小对齐"开启 → 尺寸粒度强制为一个网格单元格
           //（20px）。关闭 → 最小 1px（历史行为）。
-          if (self._snapSize) { w = Math.round(w / GRID) * GRID; h = Math.round(h / GRID) * GRID; }
-          else { w = Math.round(w); h = Math.round(h); }
+          w = self._snap(w, self._snapSize); h = self._snap(h, self._snapSize);
           if (w < NODE_MIN_W) w = NODE_MIN_W;
           if (h < NODE_MIN_H) h = NODE_MIN_H;
           //根据网格吸附后的尺寸重新锚定，使相对的（固定）
@@ -3215,7 +3343,7 @@ Object.assign(App, {
     if (!nodesContainer.dataset.tipBound) {
       nodesContainer.dataset.tipBound = '1';
       let _tipTimer;
-      const _tip = document.getElementById('nodeTip');
+      const _tip = this._getEl('nodeTip');
       nodesContainer.addEventListener('mouseover', function(e) {
         const val = e.target.closest('.node-val');
         if (!val) return;
@@ -3229,7 +3357,7 @@ Object.assign(App, {
           const nodeEl = val.closest('.node');
           const rect = nodeEl ? nodeEl.getBoundingClientRect() : null;
           if (rect) {
-            const pos = App._positionNearNode(rect, 280, 200);
+            const pos = Weave.Util.positionNearNode(rect, 280, 200);
             _tip.style.cssText = 'display:block;left:' + pos.left + 'px;top:' + pos.top + 'px';
           } else {
             _tip.style.cssText = 'display:block;left:' + (e.clientX + 14) + 'px;top:' + (e.clientY + 14) + 'px';
@@ -3244,14 +3372,6 @@ Object.assign(App, {
         clearTimeout(_tipTimer);
         _tip.style.display = 'none';
         delete _tip.dataset.mode;
-      }, true);
-      nodesContainer.addEventListener('mousemove', (e) => {
-        if (_tip.style.display === 'block' && _tip.dataset.mode !== 'node') {
-          let l2 = e.clientX + 14, t3 = e.clientY + 14;
-          if (l2 + 290 > innerWidth) l2 = innerWidth - 290;
-          if (t3 + 210 > innerHeight) t3 = innerHeight - 210;
-          _tip.style.left = l2 + 'px'; _tip.style.top = t3 + 'px';
-        }
       }, true);
     }
 
@@ -3447,21 +3567,8 @@ Object.assign(App, {
           }
         }
       }
-      //更新 z-order：被拖拽的节点移至最前。立即重新追加 DOM 子元素，
-      //以便视觉叠放顺序现在就更新，而不是等下次
-      //renderCanvas() 调用。当顺序几乎不变时 appendChild 代价很低。
-      if (self.dragState && self.dragState.nodes) {
-        let zOrderChanged = false;
-        for (const n of self.dragState.nodes) {
-          const dIdx = self._nodeZOrder.indexOf(n.id);
-          if (dIdx >= 0) self._nodeZOrder.splice(dIdx, 1);
-          //检测节点的索引是否真的改变了；只在这时才重新追加
-          //DOM 叠放栈，以避免无意义的重排。
-          if (dIdx !== self._nodeZOrder.length) zOrderChanged = true;
-          self._nodeZOrder.push(n.id);
-        }
-        if (zOrderChanged) { self._zOrderDirty = true; self._applyZOrder(); }
-      }
+      //更新 z-order：被拖拽的节点移至最前。
+      self._bringToFront(self.dragState && self.dragState.nodes);
       //单击时选中节点（没有实际的拖拽移动）
       if (!self._dragActuallyMoved && self.dragState && self.dragState.nodes.length >= 1) {
         self.selectedNodeIds.clear();
@@ -3540,7 +3647,7 @@ Object.assign(App, {
             //允许在同一对 socket 之间建立平行连线
             //（每条连线在渲染时都有自己的 id + 扇出偏移）。
             const srcNode = self._getNodeById(fromId);
-            self.canvasState.connections.push({ id: self._genId('c'), from: fromId, to: toId, label: '', mirrored: !!(srcNode && srcNode.mirrored) });
+            self.canvasState.connections.push(self._createConnection(fromId, toId, { mirrored: !!(srcNode && srcNode.mirrored) }));
             self.saveCanvasSnapshot();
           }
         }
@@ -3561,8 +3668,8 @@ Object.assign(App, {
     const r = SOCKET_HIT_RADIUS;
     for (const n of this.canvasState.nodes) {
       if (n.id === excludeNodeId) continue;
-      const inP = this._getSocketAnchor(n, 'in');
-      const outP = this._getSocketAnchor(n, 'out');
+      const inP = Weave.Geom.getSocketAnchor(n, 'in');
+      const outP = Weave.Geom.getSocketAnchor(n, 'out');
       if (requireDir !== 'in') {
         const dx = wx - inP.x, dy = wy - inP.y;
         if (dx * dx + dy * dy <= r * r) return { nodeId: n.id, dir: 'in' };
@@ -3667,93 +3774,15 @@ Object.assign(App, {
     const k = b.key;
     parts.push(k.length === 1 ? k.toUpperCase() : k);
     return parts.join('+');
-  },
-  //进入键位录制：全局捕获按键，Enter 保存 / Esc 取消，冲突则拒绝。
-  _startKeybindEdit(action, input) {
-    if (this._keybindEditing) this._cancelKeybindEdit();
-    input.dataset.orig = input.value;
-    input.classList.add('recording');
-    input.value = '';
-    input.placeholder = '…';
-    const self = this;
-    const onKey = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const key = e.key.toLowerCase();
-      if (key === 'enter') { if (self._keybindEditing) self._cancelKeybindEdit(); return; }
-      if (key === 'escape') { self._cancelKeybindEdit(); return; }
-      if (key === 'control' || key === 'meta' || key === 'shift' || key === 'alt') return;
-      const combo = {
-        ctrl: !!e.ctrlKey, meta: !!e.metaKey, alt: !!e.altKey, shift: !!e.shiftKey, key
-      };
-      if (!(combo.ctrl || combo.meta || combo.alt || combo.shift)) return; // 裸键不绑定，防误改
-      //冲突检查：与其它动作相同则拒绝
-      for (const a of Object.keys(self._keybinds)) {
-        if (a === action) continue;
-        const o = self._keybinds[a];
-        if (o && o.key === combo.key && !!o.ctrl === combo.ctrl && !!o.meta === combo.meta &&
-            !!o.alt === combo.alt && !!o.shift === combo.shift) {
-          self.showToast(self.t('toast.keybindConflict'), 'warning');
-          self._cancelKeybindEdit();
-          return;
-        }
-      }
-      self._keybinds[action] = combo;
-      self._settings.set('keybinds', JSON.stringify(self._keybinds));
-      input.value = self._keybindLabel(combo);
-      input.classList.remove('recording');
-      self._keybindEditing = null;
-      document.removeEventListener('keydown', onKey, true);
-      self.showToast(self.t('toast.keybindSaved'));
-    };
-    this._keybindEditing = { action, input, onKey };
-    document.addEventListener('keydown', onKey, true);
-  },
-  _cancelKeybindEdit() {
-    const s = this._keybindEditing;
-    if (!s) return;
-    s.input.value = s.input.dataset.orig || '';
-    s.input.classList.remove('recording');
-    this._keybindEditing = null;
-    document.removeEventListener('keydown', s.onKey, true);
-  },
-  //填充设置弹窗中的键位框并绑定录制交互（Init 调用一次）。
-  _bindKeybindInputs() {
-    const self = this;
-    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
-      const action = input.getAttribute('data-kb');
-      const b = this._keybinds[action];
-      if (b) input.value = this._keybindLabel(b);
-      input.addEventListener('click', () => {
-        input.blur();
-        self._startKeybindEdit(action, input);
-      });
-    });
-  },
-  //重置全部快捷键为平台默认（键位框即时刷新并持久化）。
-  _resetKeybinds() {
-    this._settings.set('keybinds', '');   //清空用户存档 → _loadKeybinds 返回纯默认
-    this._keybinds = this._loadKeybinds();
-    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
-      const b = this._keybinds[input.getAttribute('data-kb')];
-      if (b) input.value = this._keybindLabel(b);
-    });
-    this.showToast(this.t('toast.keysReset'));
   }
 });
 
 /* ══ M09 · 节点编辑 ───────────────────────────────────────────────────
-   职责: CRUD、剪贴板、内联编辑、描述浮层、详情弹窗
-   依赖: M02, M03, M08
+   职责: CRUD、剪贴板、内联编辑、描述浮层、详情弹窗、上下文菜单动作
+   依赖: M02, M03, M05, M08, M10
    ────────────────────────────────────────────────────────────────── */
 
 Object.assign(App, {
-  _resetAddAnchor() {
-    this._lastAddCenterX = null;
-    this._lastAddCenterY = null;
-    this._addCounter = 0;
-  },
-
   _showDescEdit(nodeId) {
     if (this.readOnly) return;
     const node = this._getNodeById(nodeId);
@@ -3761,17 +3790,17 @@ Object.assign(App, {
     if (!node || !nodeEl) return;
     this._descEditNodeId = nodeId;
     const rect = nodeEl.getBoundingClientRect();
-    const el = document.getElementById('descEdit');
-    const ta = document.getElementById('descEditTa');
+    const el = this._getEl('descEdit');
+    const ta = this._getEl('descEditTa');
     if (!el || !ta) return;
     ta.value = node.desc || '';
-    const pos = this._positionNearNode(rect, 280, 200);
+    const pos = Weave.Util.positionNearNode(rect, 280, 200);
     el.style.cssText = 'display:block;left:' + pos.left + 'px;top:' + pos.top + 'px';
     ta.focus();
     this._descEditBlur = () => { this._saveDescEdit(); };
     this._descEditKeydown = (e) => {
+      if (e.key === 'Escape') return;   //放行给全局 Escape 处理器统一关闭 + 重渲染
       e.stopPropagation();
-      if (e.key === 'Escape') { e.preventDefault(); this._closeDescEdit(); this.renderCanvas(); }
     };
     ta.addEventListener('blur', this._descEditBlur);
     ta.addEventListener('keydown', this._descEditKeydown);
@@ -3780,7 +3809,7 @@ Object.assign(App, {
   _saveDescEdit() {
     const node = this._getNodeById(this._descEditNodeId);
     if (!node) return;
-    const ta = document.getElementById('descEditTa');
+    const ta = this._getEl('descEditTa');
     if (!ta) return;
     node.desc = ta.value;
     this.saveCanvasSnapshot();
@@ -3789,8 +3818,8 @@ Object.assign(App, {
   },
 
   _closeDescEdit() {
-    const el = document.getElementById('descEdit');
-    const ta = document.getElementById('descEditTa');
+    const el = this._getEl('descEdit');
+    const ta = this._getEl('descEditTa');
     if (el) el.style.display = 'none';
     if (ta && this._descEditBlur) ta.removeEventListener('blur', this._descEditBlur);
     if (ta && this._descEditKeydown) ta.removeEventListener('keydown', this._descEditKeydown);
@@ -3849,6 +3878,12 @@ Object.assign(App, {
     this.renderCanvas();
     if (this._autoOpenModal) this.openNodeModal(id);
     return id;
+  },
+  //重置"新节点锚点"状态（清空画布与首次撤销后调用）。
+  _resetAddAnchor() {
+    this._lastAddCenterX = null;
+    this._lastAddCenterY = null;
+    this._addCounter = 0;
   },
 
   addNode() {
@@ -3909,17 +3944,9 @@ Object.assign(App, {
     //计算剪贴板节点在世界坐标中的包围盒。
     //我们希望这个包围盒的中心落在视口中心，这样
     //用户能直接看到粘贴结果（无需滚动、也不会重叠）。
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const src of this._clipboard) {
-      const x = src.x || 0, y = src.y || 0;
-      const w = src.w || NODE_W, h = src.h || NODE_H;
-      if (x < minX) minX = x;
-      if (x + w > maxX) maxX = x + w;
-      if (y < minY) minY = y;
-      if (y + h > maxY) maxY = y + h;
-    }
-    const bboxCx = (minX + maxX) / 2;
-    const bboxCy = (minY + maxY) / 2;
+    const bbox = Weave.Geom.nodesBBox(this._clipboard, src => ({ x: src.x || 0, y: src.y || 0, w: src.w || NODE_W, h: src.h || NODE_H }));
+    const bboxCx = (bbox.minX + bbox.maxX) / 2;
+    const bboxCy = (bbox.minY + bbox.maxY) / 2;
     //视口中心的世界坐标（如果容器尚未布局，则使用
     //WORLD_CENTER 原点——与 addNode 相同的回退）。
     const vc = this._viewportCenterWorld();
@@ -3938,7 +3965,7 @@ Object.assign(App, {
     this._clipboard.forEach(src => {
       this.canvasState.connections.forEach(c => {
         if (c.from === src.id && idMap[c.to]) {
-          this.canvasState.connections.push({ id: this._genId('c'), from: idMap[src.id], to: idMap[c.to], label: c.label, cp1: c.cp1, cp2: c.cp2, mirrored: !!c.mirrored });
+          this.canvasState.connections.push(this._createConnection(idMap[src.id], idMap[c.to], { label: c.label, cp1: c.cp1, cp2: c.cp2, mirrored: !!c.mirrored }));
         }
       });
     });
@@ -4025,7 +4052,7 @@ Object.assign(App, {
     const c = { id, label: src.label + ' 副本', desc: src.desc, color: src.color,
       x: (src.x || 0) + (offsetX || 30), y: (src.y || 0) + (offsetY || 30),
       mirrored: !!src.mirrored };
-    const size = this._getNodeSize(src); c.w = size.w; c.h = size.h;
+    const size = Weave.Geom.getNodeSize(src); c.w = size.w; c.h = size.h;
     this.canvasState.nodes.push(c);
     this._nodeZOrder.push(id);
     return id;
@@ -4066,8 +4093,8 @@ Object.assign(App, {
       selRange.addRange(range);
     }, 0);
     const onKey = e => {
+      if (e.key === 'Escape') return;   //放行给全局 Escape 处理器统一关闭 + 重渲染
       e.stopPropagation();
-      if (e.key === 'Escape') { e.preventDefault(); this.closeInlineEdit(); this.renderCanvas(); }
       if (e.key === 'Enter' && isTitle) { e.preventDefault(); this.saveInlineEdit(); }
     };
     const onBlur = () => { if (this._inlineEditTarget?.type === type) this.saveInlineEdit(); };
@@ -4095,6 +4122,27 @@ Object.assign(App, {
       if (nodeEl._body) nodeEl._body.onmousedown = null;
     };
   },
+  //内联编辑输入框（inlineInp / inlineTa）的键盘与失焦事件，Init 时绑定一次。
+  //Escape 放行给全局处理器统一关闭并重渲染。
+  _bindInlineInputs() {
+    const inp = this._getEl('inlineInp');
+    const ta = this._getEl('inlineTa');
+    let _blurTimer = null;
+    const onKeydown = e => {
+      if (e.key === 'Escape') return;   //放行给全局 Escape 处理器统一关闭 + 重渲染
+      e.stopPropagation();
+      clearTimeout(_blurTimer);
+      if (e.key === 'Enter' && (!this._inlineEditTarget || this._inlineEditTarget.type !== 'nodeDesc')) { e.preventDefault(); this.saveInlineEdit(); }
+    };
+    const onBlur = () => {
+      clearTimeout(_blurTimer);
+      _blurTimer = setTimeout(() => { if (this._inlineEditTarget) this.saveInlineEdit(); }, 0);
+    };
+    [inp, ta].forEach(el => {
+      el.addEventListener('keydown', onKeydown);
+      el.addEventListener('blur', onBlur);
+    });
+  },
   closeInlineEdit() {
     if (this._inlineEditTarget) {
       const t = this._inlineEditTarget.type;
@@ -4107,7 +4155,7 @@ Object.assign(App, {
       }
     }
     this._inlineEditTarget = null;
-    document.getElementById('inlineEdit').style.display = 'none';
+    this._getEl('inlineEdit').style.display = 'none';
   },
 
   _getInlineInput() {
@@ -4118,7 +4166,7 @@ Object.assign(App, {
       const el = this._nodeElMap.get(t.id);
       return el ? el.querySelector(sel) : null;
     }
-    return document.getElementById('inlineInp');
+    return this._getEl('inlineInp');
   },
 
   saveInlineEdit() {
@@ -4143,9 +4191,9 @@ Object.assign(App, {
   inlineEdit(type, id) {
     if (this.readOnly) return;
     if (this._inlineEditTarget) this.closeInlineEdit();
-    const el = document.getElementById('inlineEdit');
-    const inp = document.getElementById('inlineInp');
-    const ta = document.getElementById('inlineTa');
+    const el = this._getEl('inlineEdit');
+    const inp = this._getEl('inlineInp');
+    const ta = this._getEl('inlineTa');
     this._inlineEditTarget = { type, id };
     inp.style.display = 'none';
     ta.style.display = 'none';
@@ -4176,7 +4224,7 @@ Object.assign(App, {
       const b = this._getNodeById(conn.to);
       if (!a || !b) return;
       const g = this._getConnGeometry(conn, a, b);
-      const mp = this._connLabelPos(g.fromOut, g.toIn, g.cp);
+      const mp = Weave.Geom.connLabelPos(g.fromOut, g.toIn, g.cp);
       const cRect = this._getEl('canvasStage').getBoundingClientRect();
       const sp = { x: mp.x * this.scale + this.panX + cRect.left, y: mp.y * this.scale + this.panY + cRect.top };
       inp.value = conn.label || '';
@@ -4185,6 +4233,74 @@ Object.assign(App, {
     }
     el.style.display = 'block';
     setTimeout(() => { inp.focus(); inp.select(); }, 10);
+  },
+  //上下文菜单的数据操作（迁自 M11）：属性弹窗、镜像、调整大小、重置尺寸、复制、删除。
+  ctxProps() {
+    if (this._ctxNodeId) this.openNodeModal(this._ctxNodeId);
+    this._clearCtx();
+  },
+  ctxMirror() {
+    if (this.readOnly || !this._ctxNodeId) return;
+    const n = this._getNodeById(this._ctxNodeId);
+    if (n) {
+      n.mirrored = !n.mirrored;
+      //输出连线遵循输出侧节点的镜像状态，这会
+      //锁定其箭头方向（未镜像 → 向右，已镜像 → 向左）。
+      this.canvasState.connections.forEach(c => {
+        if (c.from === n.id) c.mirrored = !!n.mirrored;
+      });
+      this.saveCanvasSnapshot(); this.renderCanvas();
+    }
+    this._clearCtx();
+  },
+
+  //切换调整大小模式：只有在这个菜单动作之后，4 个角上的
+  //手柄才会显示在节点上。
+  ctxResize() {
+    if (this.readOnly || !this._ctxNodeId) return;
+    const el = this._nodeElMap.get(this._ctxNodeId);
+    if (el && el.classList.contains('resizing')) {
+      this._hideResizeHandles();
+    } else {
+      this._showResizeHandles(this._ctxNodeId);
+    }
+    this._clearCtx();
+  },
+
+  //将节点重置为统一的默认尺寸（170×80）。
+  ctxResetSize() {
+    if (this.readOnly || !this._ctxNodeId) return;
+    const n = this._getNodeById(this._ctxNodeId);
+    if (!n) return;
+    n.w = NODE_DEFAULT_W;
+    n.h = NODE_DEFAULT_H;
+    this.saveCanvasSnapshot();
+    this.renderCanvas();
+    this.showToast(this.t('toast.sizeReset'));
+    this._clearCtx();
+  },
+
+  ctxDup() {
+    if (this.readOnly || !this._ctxNodeId) return;
+    const src = this._getNodeById(this._ctxNodeId);
+    if (!src) return;
+    const id = this._cloneNode(src);
+    const srcId = this._ctxNodeId;
+    //双向复制该节点的连线（原地复制
+    //可以安全保留指向外部节点的连线 —— 它们本来就存在于画布上）。
+    for (const c of this.canvasState.connections.slice()) {
+      if (c.from === srcId) this.canvasState.connections.push(this._createConnection(id, c.to, { label: c.label, cp1: c.cp1, cp2: c.cp2, mirrored: !!c.mirrored }));
+      else if (c.to === srcId) this.canvasState.connections.push(this._createConnection(c.from, id, { label: c.label, cp1: c.cp1, cp2: c.cp2, mirrored: !!c.mirrored }));
+    }
+    this._clearCtx();
+    this.saveCanvasSnapshot();
+    this.renderCanvas();
+  },
+  ctxDel() {
+    if (this.readOnly) return;
+    if (this._ctxNodeId) this.removeNode(this._ctxNodeId);
+    if (this._ctxConnId) this._deleteConnection(this._ctxConnId);
+    this._clearCtx();
   }
 });
 
@@ -4197,16 +4313,18 @@ Object.assign(App, {
   _getConnById(id) {
     return this.canvasState.connections.find(c => c.id === id);
   },
-  //同一对节点之间平行连线的垂直扇出偏移。
-  //第 n 条连线（从 1 起）得到的偏移为：第 1 条 → 0（直的，位于
-  //中间），第 2 条 → −step（上方），第 3 条 → +step（下方），第 4 条 → −2·step
-  //（上方，更远），第 5 条 → +2·step（下方，更远），依此类推，交替
-  //两侧并不断增大距离。屏幕 y 向下增长，因此"上方"即
-  //负方向。
-  _connOffYFromIdx(idx) {
-    if (idx === 0) return 0;
-    return (idx % 2 === 0 ? 1 : -1) * Math.ceil(idx / 2) * CONN_OFFSET_STEP;
+  //连线创建的单一入口（socket 拖拽 / 粘贴 / 节点复制三处共用）。
+  //序列化形状与历史行为一致：socket 拖拽不写 cp1/cp2 键，
+  //粘贴与复制则始终携带（与源连线相同）。
+  _createConnection(fromId, toId, opts) {
+    const o = opts || {};
+    const c = { id: o.id || this._genId('c'), from: fromId, to: toId, label: o.label !== undefined ? o.label : '' };
+    if ('cp1' in o) c.cp1 = o.cp1;
+    if ('cp2' in o) c.cp2 = o.cp2;
+    c.mirrored = !!o.mirrored;
+    return c;
   },
+  //平行连线的垂直扇出偏移（connOffYFromIdx）已下沉至 Weave.Geom（M01）。
   //单连线查找 —— 通过惰性构建的偏移缓存实现 O(1) 复杂度
   //（在 saveCanvasSnapshot /
   //_restoreCanvasSnapshot 中每次数据变更时即失效，见下文）。
@@ -4223,7 +4341,7 @@ Object.assign(App, {
       const k = connKeyOf(conn.from, conn.to);
       const idx = counts.get(k) || 0;
       counts.set(k, idx + 1);
-      offs.set(conn.id, this._connOffYFromIdx(idx));
+      offs.set(conn.id, Weave.Geom.connOffYFromIdx(idx));
     }
     return offs;
   },
@@ -4267,7 +4385,7 @@ Object.assign(App, {
     //再次右键点击同一条连线将关闭该曲线编辑模式。
     if (this._curveEditState && this._curveEditState.connId === this._ctxConnId) {
       this._exitCurveEdit();
-      this._ctxConnId = null;
+      this._clearCtx();
       return;
     }
     const conn = this._getConnById(this._ctxConnId);
@@ -4289,7 +4407,7 @@ Object.assign(App, {
       origCp2: conn.cp2 ? { dx: conn.cp2.dx, dy: conn.cp2.dy } : null
     };
     this._renderCurveHandles();
-    this._ctxConnId = null;
+    this._clearCtx();
   },
   ctxResetCurve() {
     if (this.readOnly || !this._ctxConnId) return;
@@ -4300,7 +4418,7 @@ Object.assign(App, {
     conn.cp2 = null;
     this._exitCurveEdit();
     this.renderLines();
-    this._ctxNodeId = this._ctxConnId = null;
+    this._clearCtx();
   },
   _renderCurveHandles() {
     if (!this._curveEditState) return;
@@ -4319,9 +4437,9 @@ Object.assign(App, {
     //anchor + offY + cpDelta 处渲染，因此拖拽时必须减去 offY，才能让
     //手柄始终精确位于光标之下。
     const offY = this._getConnOffY(conn);
-    const hGroup = this._svgEl('g', { class: 'curve-handles' });
+    const hGroup = Weave.Util.svgEl('g', { class: 'curve-handles' });
     const addGuideLine = (ax, ay, hxx, hyy) => {
-      return this._svgEl('line', {
+      return Weave.Util.svgEl('line', {
         x1: ax * s, y1: ay * s, x2: hxx * s, y2: hyy * s,
         stroke: '#3b82f6', 'stroke-width': String(1.5 * s),
         'stroke-dasharray': '4 3', opacity: '0.6', 'pointer-events': 'none'
@@ -4330,7 +4448,7 @@ Object.assign(App, {
     hGroup.appendChild(addGuideLine(fromAnchor.x, fromAnchor.y, fromAnchor.x + cp.c1x, fromAnchor.y + cp.c1y));
     hGroup.appendChild(addGuideLine(toAnchor.x, toAnchor.y, toAnchor.x + cp.c2x, toAnchor.y + cp.c2y));
     const mkHandle = (idx, hx, hy) => {
-      const circle = this._svgEl('circle', {
+      const circle = Weave.Util.svgEl('circle', {
         cx: hx * s, cy: hy * s, r: 8 / s, fill: '#fff', stroke: '#3b82f6',
         'stroke-width': String(2 * s), style: 'cursor:move;pointer-events:all'
       });
@@ -4349,13 +4467,11 @@ Object.assign(App, {
           const conn2 = this._getConnById(this._curveEditState.connId);
           if (!conn2) return;
           if (idx === '1') {
-            const autoDx = Math.abs(toAnchor.x - fromAnchor.x) * 0.5;
-            const autoC1x = fromNode.mirrored ? -autoDx : autoDx;
-            conn2.cp1 = { dx: (wp.x - fromAnchor.x) - autoC1x, dy: (wp.y - fromAnchor.y) - offY };
+            const auto = Weave.Geom.getConnControlPoints(fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y, null, null, fromNode.mirrored, toNode.mirrored, 0);
+            conn2.cp1 = { dx: (wp.x - fromAnchor.x) - auto.c1x, dy: (wp.y - fromAnchor.y) - offY };
           } else {
-            const autoDx = Math.abs(toAnchor.x - fromAnchor.x) * 0.5;
-            const autoC2x = toNode.mirrored ? autoDx : -autoDx;
-            conn2.cp2 = { dx: (wp.x - toAnchor.x) - autoC2x, dy: (wp.y - toAnchor.y) - offY };
+            const auto = Weave.Geom.getConnControlPoints(fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y, null, null, fromNode.mirrored, toNode.mirrored, 0);
+            conn2.cp2 = { dx: (wp.x - toAnchor.x) - auto.c2x, dy: (wp.y - toAnchor.y) - offY };
           }
           this._renderCurveHandles();
           this.renderLines();
@@ -4410,31 +4526,14 @@ Object.assign(App, {
 });
 
 /* ══ M11 · UI 外壳 ──────────────────────────────────────────────────
-   职责: 右键菜单、关于/设置弹窗、专注模式、状态徽标
-   依赖: M02, M09, M10
+   职责: 右键菜单、关于/设置弹窗、键位录制、专注模式、状态徽标
+   依赖: M02, M08, M09, M10
    ────────────────────────────────────────────────────────────────── */
 
 Object.assign(App, {
   _clearCtx() { this._ctxNodeId = this._ctxConnId = this._ctxEditTarget = null; },
-  //弹窗在节点矩形附近的定位：在节点下方居中显示，若下方
-  //空间不足则翻转到上方。由 descEdit 和悬停提示共用。
-  _positionNearNode(rect, w, h) {
-    let left = rect.left + rect.width / 2 - w / 2;
-    let top = rect.bottom + 8;
-    if (left < 4) left = 4;
-    if (left + w > innerWidth - 4) left = innerWidth - 4 - w;
-    if (top + h > innerHeight) top = rect.top - h - 8;
-    if (top < 4) top = 4;
-    return { left, top };
-  },
-
-  _updateStatusBadge() {
-    const badge = document.getElementById('statusBadge');
-    if (!badge) return;
-    const nc = this.canvasState.nodes.length;
-    const cc = this.canvasState.connections.length;
-    badge.textContent = this.t('misc.statusBadge', { nodes: nc, conns: cc });
-  },
+  //弹窗定位（positionNearNode）已下沉至 Weave.Util（M01），
+  //由 descEdit 和悬停提示共用；_updateStatusBadge 已迁至 M02。
 
   toggleReadOnly() {
     this.readOnly = !this.readOnly;
@@ -4460,6 +4559,78 @@ Object.assign(App, {
     document.querySelectorAll('.settings-panel').forEach(panel => {
       panel.style.display = panel.getAttribute('data-settings-panel') === tab ? '' : 'none';
     });
+  },
+  //进入键位录制：全局捕获按键，Enter 保存 / Esc 取消，冲突则拒绝。
+  _startKeybindEdit(action, input) {
+    if (this._keybindEditing) this._cancelKeybindEdit();
+    input.dataset.orig = input.value;
+    input.classList.add('recording');
+    input.value = '';
+    input.placeholder = '…';
+    const self = this;
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = e.key.toLowerCase();
+      if (key === 'enter') { if (self._keybindEditing) self._cancelKeybindEdit(); return; }
+      if (key === 'escape') { self._cancelKeybindEdit(); return; }
+      if (key === 'control' || key === 'meta' || key === 'shift' || key === 'alt') return;
+      const combo = {
+        ctrl: !!e.ctrlKey, meta: !!e.metaKey, alt: !!e.altKey, shift: !!e.shiftKey, key
+      };
+      if (!(combo.ctrl || combo.meta || combo.alt || combo.shift)) return; // 裸键不绑定，防误改
+      //冲突检查：与其它动作相同则拒绝
+      for (const a of Object.keys(self._keybinds)) {
+        if (a === action) continue;
+        const o = self._keybinds[a];
+        if (o && o.key === combo.key && !!o.ctrl === combo.ctrl && !!o.meta === combo.meta &&
+            !!o.alt === combo.alt && !!o.shift === combo.shift) {
+          self.showToast(self.t('toast.keybindConflict'), 'warning');
+          self._cancelKeybindEdit();
+          return;
+        }
+      }
+      self._keybinds[action] = combo;
+      self._settings.set('keybinds', JSON.stringify(self._keybinds));
+      input.value = self._keybindLabel(combo);
+      input.classList.remove('recording');
+      self._keybindEditing = null;
+      document.removeEventListener('keydown', onKey, true);
+      self.showToast(self.t('toast.keybindSaved'));
+    };
+    this._keybindEditing = { action, input, onKey };
+    document.addEventListener('keydown', onKey, true);
+  },
+  _cancelKeybindEdit() {
+    const s = this._keybindEditing;
+    if (!s) return;
+    s.input.value = s.input.dataset.orig || '';
+    s.input.classList.remove('recording');
+    this._keybindEditing = null;
+    document.removeEventListener('keydown', s.onKey, true);
+  },
+  //填充设置弹窗中的键位框并绑定录制交互（Init 调用一次）。
+  _bindKeybindInputs() {
+    const self = this;
+    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
+      const action = input.getAttribute('data-kb');
+      const b = this._keybinds[action];
+      if (b) input.value = this._keybindLabel(b);
+      input.addEventListener('click', () => {
+        input.blur();
+        self._startKeybindEdit(action, input);
+      });
+    });
+  },
+  //重置全部快捷键为平台默认（键位框即时刷新并持久化）。
+  _resetKeybinds() {
+    this._settings.set('keybinds', '');   //清空用户存档 → _loadKeybinds 返回纯默认
+    this._keybinds = this._loadKeybinds();
+    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
+      const b = this._keybinds[input.getAttribute('data-kb')];
+      if (b) input.value = this._keybindLabel(b);
+    });
+    this.showToast(this.t('toast.keysReset'));
   },
   closeSettings() {
     document.getElementById('settingsModal').classList.remove('on');
@@ -4504,9 +4675,9 @@ Object.assign(App, {
     set('ctxSepCurve', isConn);
     set('ctxResetCurve', isConn);
 
-    const ctxEdit = document.getElementById('ctxEdit');
+    const ctxEdit = this._getEl('ctxEdit');
     if (ctxEdit) ctxEdit.textContent = isConn ? '编辑文字' : (editTarget === 'desc' ? '编辑描述' : '编辑');
-    const m = document.getElementById('ctx');
+    const m = this._getEl('ctx');
     m.style.left = Math.max(0, Math.min(x, innerWidth - 110)) + 'px';
     m.style.top = Math.max(0, Math.min(y, innerHeight - 100)) + 'px';
     m.style.display = 'block';
@@ -4525,73 +4696,6 @@ Object.assign(App, {
       }
     }
     if (this._ctxConnId) this.inlineEdit('edge', this._ctxConnId);
-    this._clearCtx();
-  },
-  ctxProps() {
-    if (this._ctxNodeId) this.openNodeModal(this._ctxNodeId);
-    this._ctxNodeId = null;
-  },
-  ctxMirror() {
-    if (this.readOnly || !this._ctxNodeId) return;
-    const n = this._getNodeById(this._ctxNodeId);
-    if (n) {
-      n.mirrored = !n.mirrored;
-      //输出连线遵循输出侧节点的镜像状态，这会
-      //锁定其箭头方向（未镜像 → 向右，已镜像 → 向左）。
-      this.canvasState.connections.forEach(c => {
-        if (c.from === n.id) c.mirrored = !!n.mirrored;
-      });
-      this.saveCanvasSnapshot(); this.renderCanvas();
-    }
-    this._ctxNodeId = null;
-  },
-
-  //切换调整大小模式：只有在这个菜单动作之后，4 个角上的
-  //手柄才会显示在节点上。
-  ctxResize() {
-    if (this.readOnly || !this._ctxNodeId) return;
-    const el = this._nodeElMap.get(this._ctxNodeId);
-    if (el && el.classList.contains('resizing')) {
-      this._hideResizeHandles();
-    } else {
-      this._showResizeHandles(this._ctxNodeId);
-    }
-    this._ctxNodeId = null;
-  },
-
-  //将节点重置为统一的默认尺寸（170×80）。
-  ctxResetSize() {
-    if (this.readOnly || !this._ctxNodeId) return;
-    const n = this._getNodeById(this._ctxNodeId);
-    if (!n) return;
-    n.w = NODE_DEFAULT_W;
-    n.h = NODE_DEFAULT_H;
-    this.saveCanvasSnapshot();
-    this.renderCanvas();
-    this.showToast(this.t('toast.sizeReset'));
-    this._ctxNodeId = null;
-  },
-
-  ctxDup() {
-    if (this.readOnly || !this._ctxNodeId) return;
-    const src = this._getNodeById(this._ctxNodeId);
-    if (!src) return;
-    const id = this._cloneNode(src);
-    const srcId = this._ctxNodeId;
-    //双向复制该节点的连线（原地复制
-    //可以安全保留指向外部节点的连线 —— 它们本来就存在于画布上）。
-    for (const c of this.canvasState.connections.slice()) {
-      if (c.from === srcId) this.canvasState.connections.push({ id: this._genId('c'), from: id, to: c.to, label: c.label, cp1: c.cp1, cp2: c.cp2, mirrored: !!c.mirrored });
-      else if (c.to === srcId) this.canvasState.connections.push({ id: this._genId('c'), from: c.from, to: id, label: c.label, cp1: c.cp1, cp2: c.cp2, mirrored: !!c.mirrored });
-    }
-    this._ctxNodeId = null;
-    this.saveCanvasSnapshot();
-    this.renderCanvas();
-  },
-  ctxDel() {
-    if (this.readOnly) return;
-    if (this._ctxNodeId) this.removeNode(this._ctxNodeId);
-    if (this._ctxConnId) this._deleteConnection(this._ctxConnId);
     this._clearCtx();
   }
 });
@@ -4630,70 +4734,9 @@ Object.assign(App, {
     this.showToast(this.t('toast.exported'));
   },
 
-  //旧版 PNG 重绘使用的圆角矩形路径。`flatBottom` 跳过
-  //底部的圆角（用于 34px 高的标题条区域）。
-  _roundedRectPath(ctx, x, y, w, h, r, flatBottom) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    if (flatBottom) {
-      ctx.lineTo(x + w, y + h);
-      ctx.lineTo(x, y + h);
-    } else {
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    }
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  },
-
-  _truncateDescForExport(ctx, desc, maxWidth, maxLines) {
-    const linesLimit = maxLines || 2;
-    ctx.font = '11px Inter, sans-serif';
-    const rawLines = (desc || '').split('\n');
-    const visualLines = [];
-    let hasMore = false;
-    let vi = 0;
-    for (; vi < rawLines.length && visualLines.length < linesLimit; vi++) {
-      let line = rawLines[vi];
-      while (line.length > 0 && visualLines.length < linesLimit) {
-        let truncated = '';
-        for (let ci = 0; ci < line.length; ci++) {
-          const next = truncated + line[ci];
-          if (ctx.measureText(next).width > maxWidth) break;
-          truncated = next;
-        }
-        if (truncated.length === 0) truncated = line.slice(0, 1);
-        visualLines.push(truncated);
-        line = line.slice(truncated.length);
-        if (line.length > 0) hasMore = true;
-      }
-    }
-    if (vi < rawLines.length) hasMore = true;
-    return { lines: visualLines.slice(0, linesLimit), truncated: hasMore };
-  },
-
-  //一个实心的小型圆角箭头，箭头尖端位于 (x,y)，指向
-  //`angle` 方向（旋转方向即曲线切线方向）。
-  _drawExportArrow(ctx, x, y, angle, color) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(angle);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-7, 2.4);
-    ctx.quadraticCurveTo(-9, 0, -7, -2.4);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.restore();
-  },
-
-  //── 导出 PNG（DOM 快照）──
+  //旧版 PNG 重绘使用的圆角矩形路径（roundedRectPath）与
+  //导出辅助工具（truncateDescForExport / drawExportArrow /
+  //arrayBufferToBase64）均已下沉至 Weave.Util（M01）。
   //通过捕获画布最终渲染出的 DOM（节点、socket、
   //标题、阴影 —— 当前 CSS 产生的任何内容）来导出，而不是
   //从数据重新绘制一切。活动的 #canvasWorld 会被克隆，
@@ -4708,16 +4751,6 @@ Object.assign(App, {
   //输出仅受浏览器画布上限约束（约 16384px/边），
   //而不是旧版 4096px 的警告。无法将
   //foreignObject 作为图片栅格化的引擎（Firefox）会回退到 _exportPNGLegacy。
-
-  _arrayBufferToBase64(buf) {
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-    }
-    return btoa(bin);
-  },
 
   //将 Inter webfont 以 data URI 形式内联进导出的 SVG。作为 <img> 加载的
   //SVG 会拒绝外部请求，因此如果不做内联，导出的
@@ -4742,7 +4775,7 @@ Object.assign(App, {
         if (!fam || !url) continue;
         const fontRes = await withTimeout(fetch(url[1]), 5000);
         if (!fontRes.ok) continue;
-        const b64 = this._arrayBufferToBase64(await fontRes.arrayBuffer());
+        const b64 = Weave.Util.arrayBufferToBase64(await fontRes.arrayBuffer());
         let rule = "@font-face{font-family:'" + fam[1] + "';font-style:" + (st ? st[1] : 'normal') + ";font-weight:" + (w ? w[1] : '400') + ";src:url(data:font/woff2;base64," + b64 + ") format('woff2')";
         if (ur) rule += ';unicode-range:' + ur[1];
         out.push(rule + '}');
@@ -4792,12 +4825,12 @@ Object.assign(App, {
     //该缩放级别下才有效。与实时渲染使用相同的数据与几何辅助函数。
     const oldSvg = sn.querySelector('#linesSvg');
     if (oldSvg) oldSvg.remove();
-    const svg = this._svgEl('svg', { class: 'lines-svg', width: '1', height: '1' });
+    const svg = Weave.Util.svgEl('svg', { class: 'lines-svg', width: '1', height: '1' });
     svg.style.overflow = 'visible';
     svg.style.setProperty('--line-scale', '1');
-    const connGroup = this._svgEl('g', { class: 'conn-group' });
-    const linesGroup = this._svgEl('g', { class: 'lines' });
-    const labelsGroup = this._svgEl('g', { class: 'labels' });
+    const connGroup = Weave.Util.svgEl('g', { class: 'conn-group' });
+    const linesGroup = Weave.Util.svgEl('g', { class: 'lines' });
+    const labelsGroup = Weave.Util.svgEl('g', { class: 'labels' });
     labelsGroup.style.fontSize = '10px';
     connGroup.appendChild(linesGroup);
     connGroup.appendChild(labelsGroup);
@@ -4806,18 +4839,18 @@ Object.assign(App, {
       const fromNode = nodeMap.get(conn.from), toNode = nodeMap.get(conn.to);
       if (!fromNode || !toNode) return;
       const geo = this._buildLinePath(conn, fromNode, toNode, 1);
-      const path = this._svgEl('path', { d: geo.d, class: geo.pathCls });
+      const path = Weave.Util.svgEl('path', { d: geo.d, class: geo.pathCls });
       if (geo.pathStyle) path.setAttribute('style', geo.pathStyle);
       linesGroup.appendChild(path);
       //箭头（与实时渲染相同的钳制线段逻辑，比例 1）
-      const ar = this._connArrows(geo.fromOut, geo.toIn, geo.cp, 1, this._resolveColor(fromNode.color).hex,
-        this._connArrowBaseX(fromNode), this._connArrowBaseX(toNode));
+      const ar = Weave.Geom.connArrows(geo.fromOut, geo.toIn, geo.cp, 1, this._resolveColor(fromNode.color).hex,
+        Weave.Geom.connArrowBaseX(fromNode), Weave.Geom.connArrowBaseX(toNode));
       const arrowStyle = 'stroke-width:' + ar.strokeW + ';stroke:' + ar.hex;
-      linesGroup.appendChild(this._svgEl('path', { class: 'conn-arrow', d: ar.dOut, fill: ar.hex, style: arrowStyle }));
-      linesGroup.appendChild(this._svgEl('path', { class: 'conn-arrow', d: ar.dIn, fill: ar.hex, style: arrowStyle }));
+      linesGroup.appendChild(Weave.Util.svgEl('path', { class: 'conn-arrow', d: ar.dOut, fill: ar.hex, style: arrowStyle }));
+      linesGroup.appendChild(Weave.Util.svgEl('path', { class: 'conn-arrow', d: ar.dIn, fill: ar.hex, style: arrowStyle }));
       if (conn.label) {
-        const mp = this._connLabelPos(geo.fromOut, geo.toIn, geo.cp);
-        const t = this._svgEl('text', {
+        const mp = Weave.Geom.connLabelPos(geo.fromOut, geo.toIn, geo.cp);
+        const t = Weave.Util.svgEl('text', {
           class: 'line-label', 'text-anchor': 'middle', 'dominant-baseline': 'middle',
           'font-style': 'italic', fill: '#4a5568', x: mp.x, y: mp.y
         });
@@ -4932,8 +4965,8 @@ Object.assign(App, {
     };
     let hits = 0;
     for (const n of nodes) {
-      const { x: nx, y: ny, w } = this._getNodeRect(n);
-      const outP = this._getSocketAnchor(n, 'out');
+      const { x: nx, y: ny, w } = Weave.Geom.getNodeRect(n);
+      const outP = Weave.Geom.getSocketAnchor(n, 'out');
       if (sample(nx + w / 2, ny + 14) || sample(outP.x, outP.y)) hits++;
     }
     return hits / nodes.length;
@@ -4947,8 +4980,8 @@ Object.assign(App, {
     const wR = worldL + W / dpr, wB = worldT + H / dpr;
     const toX = wx => Math.round((wx - worldL) * dpr) + 0.5;
     const toY = wy => Math.round((wy - worldT) * dpr) + 0.5;
-    this._strokeGridLines(ctx, GRID, GRID_MINOR_COLOR, worldL, worldT, wR, wB, toX, toY);
-    this._strokeGridLines(ctx, GRID * 5, GRID_MAJOR_COLOR, worldL, worldT, wR, wB, toX, toY);
+    Weave.Util.strokeGridLines(ctx, GRID, GRID_MINOR_COLOR, worldL, worldT, wR, wB, toX, toY);
+    Weave.Util.strokeGridLines(ctx, GRID * 5, GRID_MAJOR_COLOR, worldL, worldT, wR, wB, toX, toY);
     ctx.restore();
   },
 
@@ -4961,10 +4994,8 @@ Object.assign(App, {
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (y < minY) minY = y; if (y > maxY) maxY = y;
     };
-    this.canvasState.nodes.forEach(n => {
-      const { x: nx, y: ny, w, h } = this._getNodeRect(n);
-      consider(nx, ny); consider(nx + w, ny + h);
-    });
+    const bb = Weave.Geom.nodesBBox(this.canvasState.nodes, n => Weave.Geom.getNodeRect(n));
+    if (Number.isFinite(bb.minX)) { consider(bb.minX, bb.minY); consider(bb.maxX, bb.maxY); }
     if (includeConnControls) {
       const nodeMap = this._getNodeMap();
       //扇出偏移必须纳入边界中：平行曲线
@@ -5065,8 +5096,8 @@ Object.assign(App, {
     const gEndX = maxX + pad, gEndY = maxY + pad;
     ctx.lineWidth = 1;
     const id = wx => wx;
-    this._strokeGridLines(ctx, minorStep, GRID_MINOR_COLOR, gStartX, gStartY, gEndX, gEndY, id, id);
-    this._strokeGridLines(ctx, majorStep, GRID_MAJOR_COLOR, gStartX, gStartY, gEndX, gEndY, id, id);
+    Weave.Util.strokeGridLines(ctx, minorStep, GRID_MINOR_COLOR, gStartX, gStartY, gEndX, gEndY, id, id);
+    Weave.Util.strokeGridLines(ctx, majorStep, GRID_MAJOR_COLOR, gStartX, gStartY, gEndX, gEndY, id, id);
     const nodeMap = this._getNodeMap();
     this.canvasState.connections.forEach((conn) => {
       const fromNode = nodeMap.get(conn.from), toNode = nodeMap.get(conn.to);
@@ -5081,12 +5112,12 @@ Object.assign(App, {
       ctx.stroke();
       ctx.globalAlpha = 1;
       //箭头（与实时渲染相同的钳制线段向量逻辑）
-      const ar = this._connArrows(fromP, toP, cp, 1, rc.hex,
-        this._connArrowBaseX(fromNode), this._connArrowBaseX(toNode));
-      this._drawExportArrow(ctx, ar.outTipX, ar.outTipY, Math.atan2(ar.vOut.y, ar.vOut.x), rc.hex);
-      this._drawExportArrow(ctx, ar.inTipX, ar.inTipY, Math.atan2(ar.vIn.y, ar.vIn.x), rc.hex);
+      const ar = Weave.Geom.connArrows(fromP, toP, cp, 1, rc.hex,
+        Weave.Geom.connArrowBaseX(fromNode), Weave.Geom.connArrowBaseX(toNode));
+      Weave.Util.drawExportArrow(ctx, ar.outTipX, ar.outTipY, Math.atan2(ar.vOut.y, ar.vOut.x), rc.hex);
+      Weave.Util.drawExportArrow(ctx, ar.inTipX, ar.inTipY, Math.atan2(ar.vIn.y, ar.vIn.x), rc.hex);
       if (conn.label) {
-        const mp = this._connLabelPos(fromP, toP, cp);
+        const mp = Weave.Geom.connLabelPos(fromP, toP, cp);
         ctx.font = 'italic 10px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -5099,11 +5130,11 @@ Object.assign(App, {
       }
     });
     this.canvasState.nodes.forEach((n) => {
-      const { x: nx, y: ny, w: nw, h: nh } = this._getNodeRect(n);
+      const { x: nx, y: ny, w: nw, h: nh } = Weave.Geom.getNodeRect(n);
       const rc = this._resolveColor(n.color);
       const r = 12;
       ctx.shadowColor = 'rgba(0,0,0,0.06)'; ctx.shadowBlur = 20; ctx.shadowOffsetY = 6;
-      this._roundedRectPath(ctx, nx, ny, nw, nh, r, false);
+      Weave.Util.roundedRectPath(ctx, nx, ny, nw, nh, r, false);
       ctx.fillStyle = '#fff'; ctx.fill();
       ctx.shadowColor = 'transparent'; ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
       ctx.stroke();
@@ -5113,14 +5144,14 @@ Object.assign(App, {
         if (p) { grad.addColorStop(0, p.start); grad.addColorStop(1, p.end); }
         else { grad.addColorStop(0, rc.hex); grad.addColorStop(1, rc.hex); }
       } else { grad.addColorStop(0, rc.hex); grad.addColorStop(1, rc.shadeHex || rc.hex); }
-      this._roundedRectPath(ctx, nx, ny, nw, 34, r, true);
+      Weave.Util.roundedRectPath(ctx, nx, ny, nw, 34, r, true);
       ctx.fillStyle = grad; ctx.fill();
       ctx.fillStyle = '#fff'; ctx.font = '500 12px Inter, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1; ctx.shadowOffsetX = 0;
       ctx.fillText(n.label || '\u672A\u547D\u540D', nx + 14, ny + 17, nw - 28);
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.shadowOffsetX = 0;
       const socketR = 8, socketInnerR = 4;
-      const outP = this._getSocketAnchor(n, 'out'), inP = this._getSocketAnchor(n, 'in');
+      const outP = Weave.Geom.getSocketAnchor(n, 'out'), inP = Weave.Geom.getSocketAnchor(n, 'in');
       [outP.x, inP.x].forEach((sx) => {
         ctx.beginPath();
         ctx.arc(sx, outP.y, socketR, 0, Math.PI * 2);
@@ -5142,7 +5173,7 @@ Object.assign(App, {
         ctx.fillStyle = '#1a1d24';
         ctx.font = '11px Inter, sans-serif';
         const maxLines = Math.max(2, Math.floor((nh - 46) / 13));
-        const { lines, truncated } = this._truncateDescForExport(ctx, n.desc, bodyW, maxLines);
+        const { lines, truncated } = Weave.Util.truncateDescForExport(ctx, n.desc, bodyW, maxLines);
         const lineH = 13;
         const startY = bodyCenter - ((lines.length - 1) * lineH) / 2;
         lines.forEach((ln, i) => {
@@ -5188,18 +5219,20 @@ let _panLastEvent = null;
 document.addEventListener('mousemove', function(e) {
   if (App.isDragging) return;
   if (App.canvasBoxState) {
-    const wp = App.getWorldPos(e.clientX, e.clientY);
-    App.canvasBoxState.curX = wp.x; App.canvasBoxState.curY = wp.y;
-    const lx = Math.min(App.canvasBoxState.startX, wp.x);
-    const ly = Math.min(App.canvasBoxState.startY, wp.y);
-    const rx = Math.max(App.canvasBoxState.startX, wp.x);
-    const ry = Math.max(App.canvasBoxState.startY, wp.y);
-    const overlay = document.getElementById('boxSelectOverlay');
-    if (overlay) {
-      overlay.style.left = (lx * App.scale + App.panX) + 'px';
-      overlay.style.top = (ly * App.scale + App.panY) + 'px';
-      overlay.style.width = ((rx - lx) * App.scale) + 'px';
-      overlay.style.height = ((ry - ly) * App.scale) + 'px';
+    const box = App.canvasBoxState;
+    //矩形在 mousedown 时缓存（拖拽期间画布不移动）。
+    const rect = box.rect;
+    if (rect) {
+      const wp = Weave.Geom.screenToWorld(e.clientX - rect.left, e.clientY - rect.top, App.panX, App.panY, App.scale);
+      box.curX = wp.x; box.curY = wp.y;
+      const br = Weave.Geom.boxRect(box.startX, box.startY, wp.x, wp.y);
+      const overlay = App._getEl('boxSelectOverlay');
+      if (overlay) {
+        overlay.style.left = (br.lx * App.scale + App.panX) + 'px';
+        overlay.style.top = (br.ly * App.scale + App.panY) + 'px';
+        overlay.style.width = ((br.rx - br.lx) * App.scale) + 'px';
+        overlay.style.height = ((br.ry - br.ly) * App.scale) + 'px';
+      }
     }
   }
   if (App.canvasPanState) {
@@ -5213,7 +5246,7 @@ document.addEventListener('mousemove', function(e) {
         App.panY = App.canvasPanState.origPanY + (ev.clientY - App.canvasPanState.startY);
         App.clampPan();
         /*只更新 world 平移 + 网格（缩放不变）*/
-        const world = document.getElementById('canvasWorld');
+        const world = App._getEl('canvasWorld');
         if (world) world.style.transform = T(App.panX, App.panY);
         App._drawGrid();
         App.updateCoordDisplay();
@@ -5248,30 +5281,11 @@ document.addEventListener('mouseup', function(e) {
   if (!(et && et.closest && et.closest('.node'))) App._suppressNextCanvasClick = true;
 }, true);
 
-//内联编辑事件
-(function() {
-  const inp = document.getElementById('inlineInp');
-  const ta = document.getElementById('inlineTa');
-  let _blurTimer = null;
-  function onKeydown(e) {
-    e.stopPropagation();
-    clearTimeout(_blurTimer);
-    if (e.key === 'Enter' && App._inlineEditTarget?.type !== 'nodeDesc') { e.preventDefault(); App.saveInlineEdit(); }
-    if (e.key === 'Escape') { App.closeInlineEdit(); App.renderCanvas(); }
-  }
-  function onBlur() {
-    clearTimeout(_blurTimer);
-    _blurTimer = setTimeout(() => { if (App._inlineEditTarget) App.saveInlineEdit(); }, 0);
-  }
-  [inp, ta].forEach(el => {
-    el.addEventListener('keydown', onKeydown);
-    el.addEventListener('blur', onBlur);
-  });
-})();
+//内联编辑事件（输入框键盘/失焦绑定已移入 App._bindInlineInputs，Init 时调用）
 
 //上下文菜单关闭（捕获阶段：在菜单项的
 //冒泡 click 消费掉存储的 ctx 状态之前隐藏菜单）
-document.addEventListener('click', () => { document.getElementById('ctx').style.display = 'none'; document.body.classList.remove('ctx-open'); }, true);
+document.addEventListener('click', () => { App._getEl('ctx').style.display = 'none'; document.body.classList.remove('ctx-open'); }, true);
 
 //弹窗事件
 document.getElementById('cpModal').addEventListener('click', function(e) { if (e.target === this) App.cancelCustomPicker(); });
@@ -5288,8 +5302,18 @@ document.addEventListener('keydown', function(e) {
   else if (App._keyMatch('paste', e)) { if (!isEditing) App.pasteNodes(); }
   else if (App._keyMatch('autoModal', e)) { e.preventDefault(); App._autoOpenModal = !App._autoOpenModal; App._settings.setBool('autoModal', App._autoOpenModal); App.showToast(App.t(App._autoOpenModal ? 'toast.autoModalOn' : 'toast.autoModalOff')); }
   else if (App._keyMatch('chrome', e)) { e.preventDefault(); if (!isEditing) App.toggleChrome(); }
-  else if (e.key === 'Escape') { App.closeModal(); App.closeSettings(); App.closeInlineEdit(); if (App._curveEditState) App._exitCurveEdit(true); }
-  else if (App._keyMatch('delete', e) && !isEditing && !document.getElementById('modal').classList.contains('on')) {
+  else if (e.key === 'Escape') {
+    App.closeModal(); App.closeSettings();
+    const hadInline = !!App._inlineEditTarget;
+    if (hadInline) App.closeInlineEdit();
+    const hadDesc = !!App._descEditNodeId;
+    if (hadDesc) App._closeDescEdit();
+    if (App._curveEditState) App._exitCurveEdit(true);
+    //内联/描述编辑的本地 Escape 处理器已放行到此处统一关闭；
+    //closeInlineEdit 本身不重渲染，Escape 撤销路径需要恢复 DOM 文本。
+    if (hadInline || hadDesc) App.renderCanvas();
+  }
+  else if (App._keyMatch('delete', e) && !isEditing && !App._getEl('modal').classList.contains('on')) {
     if (App.readOnly) return;
     if (App.selectedNodeIds.size > 0) { App.removeNodes([...App.selectedNodeIds]); }
     else if (App.selectedConnIds.size > 0) { App._deleteConnections([...App.selectedConnIds]); }
@@ -5308,15 +5332,13 @@ document.addEventListener('keydown', function(e) {
   //自定义快捷键表加载 + 快速入门键位框填充与录制绑定。
   App._keybinds = App._loadKeybinds();
   App._bindKeybindInputs();
-  const saved = App._lsGet('flow_data');
+  App._bindInlineInputs();
+  const saved = App._lsGetJson('flow_data');
   let restored = false;
   if (saved) {
-    try {
-      const d = JSON.parse(saved);
-      //仅在确有内容时才恢复（与历史行为一致：
-      //空的已保存画布仍然从原点居中开始）。
-      if (d.nodes && d.nodes.length) restored = App._restoreFromSerialized(d, { emptyToOrigin: false });
-    } catch (e) { /*忽略*/ }
+    //仅在确有内容时才恢复（与历史行为一致：
+    //空的已保存画布仍然从原点居中开始）。
+    if (saved.nodes && saved.nodes.length) restored = App._restoreFromSerialized(saved, { emptyToOrigin: false });
   }
   if (!restored) { App.renderCanvas({ center: false }); App.centerCanvasOnOrigin(); }
 

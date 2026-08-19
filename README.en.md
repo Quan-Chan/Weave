@@ -39,6 +39,15 @@ Weave is built with pure front-end technologies — no frameworks, no dependenci
 
 <hr>
 
+<h2>Performance test data</h2>
+
+Two test archives are bundled for performance stress-testing. Load them in Weave via **Import** (the JSON import button, or drag-and-drop the file onto the canvas):
+
+- **`weave_250_nodes.json`** — a regular graph with 250 nodes and 465 connections
+- **`weave_250_fullmesh.json`** — a full-mesh graph with 250 nodes and 62,250 connections, for extreme stress-testing
+
+<hr>
+
 <h2>License</h2>
 
 Open-sourced under the <a href="LICENSE">Apache License 2.0</a>.
