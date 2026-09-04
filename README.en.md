@@ -20,6 +20,7 @@
 
 - **Nodes** — add, delete, select (click / box-select / multi-select), drag to move, inline editing, copy & paste
 - **Connections** — create by dragging sockets, delete, edit labels, custom Bézier curve adjustments
+- **Regions** — draw a region frame (Region key / Alt+drag), move it with its contained nodes, edit name/color or delete via right-click, nodes dragged in are owned automatically
 - **Canvas** — pan (drag / middle button), wheel zoom, fit view, editable coordinate HUD
 - **Colors** — 5 presets + custom color-wheel picker, Ctrl+wheel to cycle quickly
 - **Import / Export** — JSON import/export (with viewport info), PNG export, drag-and-drop JSON import
@@ -43,8 +44,8 @@ Weave is built with pure front-end technologies — no frameworks, no dependenci
 
 Two test archives are bundled for performance stress-testing. Load them in Weave via **Import** (the JSON import button, or drag-and-drop the file onto the canvas):
 
-- **`weave_250_nodes.json`** — a regular graph with 250 nodes and 465 connections
-- **`weave_250_fullmesh.json`** — a full-mesh graph with 250 nodes and 62,250 connections, for extreme stress-testing
+- **`test/samples/weave_250_nodes.json`** — a regular graph with 250 nodes and 465 connections
+- **`test/samples/weave_250_fullmesh.json`** — a full-mesh graph with 250 nodes and 62,250 connections, for extreme stress-testing
 
 <hr>
 

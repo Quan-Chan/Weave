@@ -1,2 +1,20 @@
 # 结构示例 - 测试数据文件，不需要纳入版本管理
 结构示例/
+
+# 本地备份副本（手动另存的 *副本* 文件），不入库
+*副本*
+
+# GUI 冒烟测试依赖与产物（node_modules 由 npm install 生成；截图可自行查看）
+test/node_modules/
+test/.npm-cache/
+# test/package-lock.json 需入库: GitHub CI 用 npm ci 依赖锁文件复现安装
+test/shots/
+test/shots-*/
+
+
+test/tmp/
+
+# 一次性重构工具与中间产物（模块化重构已提交，不再需要）
+test/refactor/*
+# weave-parse.js 是 check-structure.js 运行时依赖(结构守护解析器),需入库
+!test/refactor/weave-parse.js

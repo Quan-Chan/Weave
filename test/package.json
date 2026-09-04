@@ -1,0 +1,24 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node check-structure.js && node gui-smoke.js && node region-smoke.js && node collapse-test.js && node collapse-edge-test.js && node fold-click-badge-test.js && node fold-flush-sync-test.js && node fold-zoom-twitch-test.js && node node-drag-snap-test.js && node undo-cap-test.js && node geom-unit-test.js && node repro-bugs.js",
+    "test:structure": "node check-structure.js",
+    "test:gui": "node gui-smoke.js",
+    "test:region": "node region-smoke.js",
+    "test:collapse": "node collapse-test.js && node collapse-edge-test.js",
+    "test:fast": "node geom-unit-test.js && node check-structure.js",
+    "test:fold": "node fold-click-badge-test.js && node fold-flush-sync-test.js && node fold-zoom-twitch-test.js",
+    "test:undo": "node undo-cap-test.js",
+    "test:repro": "node repro-bugs.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "puppeteer-core": "^25.7.0"
+  }
+}

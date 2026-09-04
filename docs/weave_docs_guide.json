@@ -1,0 +1,342 @@
+{
+  "nodes": [
+    {
+      "id": "root",
+      "label": "Weave 文档导读",
+      "desc": "导读 docs/ 目录三份文档。节点右侧输出点徽标: − 可收起 / + 已收起, 点击切换。",
+      "color": "blue",
+      "x": 0,
+      "y": 0,
+      "w": 10,
+      "h": 5,
+      "mirrored": false
+    },
+    {
+      "id": "doc1",
+      "label": "① 开发流程",
+      "desc": "docs/development-workflow.md",
+      "x": 25,
+      "y": -9,
+      "w": 8.5,
+      "h": 4,
+      "mirrored": false,
+      "color": "green",
+      "collapse": {
+        "hidden": [
+          {
+            "id": "doc1_p1",
+            "dx": 15,
+            "dy": 0
+          },
+          {
+            "id": "doc1_p2",
+            "dx": 29.95,
+            "dy": 0
+          },
+          {
+            "id": "doc1_p3",
+            "dx": 45,
+            "dy": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "doc1_p1",
+      "label": "实现功能",
+      "desc": "按需求修改代码。新增方法加入所属模块 Object.assign(App,{...}) 块; 纯函数放入 Weave.Util/Color/Geom。",
+      "x": 40,
+      "y": -9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "green"
+    },
+    {
+      "id": "doc1_p2",
+      "label": "测试功能",
+      "desc": "确认未破坏已有功能。失败按原因处理: 预期行为变化→更新断言; 移除功能→删除对应测试与断言; 意外回归→修代码返回实现阶段。",
+      "x": 54.95,
+      "y": -9,
+      "w": 10,
+      "h": 7,
+      "mirrored": false,
+      "color": "green"
+    },
+    {
+      "id": "doc1_p3",
+      "label": "优化代码质量",
+      "desc": "分析新增与修改代码: 模块归属、重复代码、命名、注释合规、结构守护。",
+      "x": 70,
+      "y": -9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "green"
+    },
+    {
+      "id": "doc2",
+      "label": "② 文档与注释规范",
+      "desc": "docs/documentation-and-comments.md",
+      "x": 25,
+      "y": 0,
+      "w": 8.5,
+      "h": 4,
+      "mirrored": false,
+      "color": "orange",
+      "collapse": {
+        "hidden": [
+          {
+            "id": "doc2_p1",
+            "dx": 15,
+            "dy": 0
+          },
+          {
+            "id": "doc2_p2",
+            "dx": 30,
+            "dy": 0
+          },
+          {
+            "id": "doc2_p3",
+            "dx": 45,
+            "dy": 0
+          },
+          {
+            "id": "doc2_p4",
+            "dx": 60,
+            "dy": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "doc2_p1",
+      "label": "禁止",
+      "desc": "不使用强调/评价词/推荐语/极端化/转折悬念/营销口吻/过度解释/元信息。必要信息作头信息直接陈述。",
+      "x": 40,
+      "y": 0,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "orange"
+    },
+    {
+      "id": "doc2_p2",
+      "label": "不推荐的用词",
+      "desc": "拆解、兜底、优雅、流水、约定、语义、精通、一步步、稳稳、只记、一律、精准、原子、准则、原则。",
+      "x": 55,
+      "y": 0,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "orange"
+    },
+    {
+      "id": "doc2_p3",
+      "label": "不推荐的句式",
+      "desc": "“不是…，是” / “不是…，…” / “…，但…” / “…就…”",
+      "x": 70,
+      "y": 0,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "orange"
+    },
+    {
+      "id": "doc2_p4",
+      "label": "要求",
+      "desc": "高信息密度; 代码放代码块; 行内代码与路径用反引号; 默认值、行为、顺序、名称准确。",
+      "x": 85,
+      "y": 0,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "orange"
+    },
+    {
+      "id": "doc3",
+      "label": "③ 软件本体形式",
+      "desc": "docs/application-form.md",
+      "x": 25,
+      "y": 9,
+      "w": 8.5,
+      "h": 4,
+      "mirrored": false,
+      "color": "cyan",
+      "collapse": {
+        "hidden": [
+          {
+            "id": "doc3_p1",
+            "dx": 15,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p2",
+            "dx": 30,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p3",
+            "dx": 45,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p4",
+            "dx": 60,
+            "dy": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "doc3_p1",
+      "label": "存在形式",
+      "desc": "APPs/Weave.html 为唯一应用文件, HTML/CSS/JS 内联, 零本地依赖。",
+      "x": 40,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p2",
+      "label": "数据模型",
+      "desc": "canvasState = { nodes, connections, regions, history }。内存像素, 存档格单位。",
+      "x": 55,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p3",
+      "label": "模块划分",
+      "desc": "<script> 13 模块拼接 (M01 常量与工具 → M13 装配与启动), check-structure.js 守护。",
+      "x": 70,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p4",
+      "label": "代码规则",
+      "desc": "App 方法简写 + Object.assign 分块; 纯函数入 Weave.*; 内部成员下划线前缀。",
+      "x": 85,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    }
+  ],
+  "connections": [
+    {
+      "id": "c_g_1",
+      "from": "root",
+      "to": "doc1",
+      "label": "展开后按阶段顺序阅读",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_2",
+      "from": "doc1",
+      "to": "doc1_p1",
+      "label": "阶段 1",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_3",
+      "from": "doc1_p1",
+      "to": "doc1_p2",
+      "label": "阶段 2",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_4",
+      "from": "doc1_p2",
+      "to": "doc1_p3",
+      "label": "阶段 3",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_5",
+      "from": "root",
+      "to": "doc2",
+      "label": "编写文档或注释前阅读",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_6",
+      "from": "doc2",
+      "to": "doc2_p1",
+      "label": "禁止事项",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_7",
+      "from": "doc2_p1",
+      "to": "doc2_p2",
+      "label": "不推荐用词",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_8",
+      "from": "doc2_p2",
+      "to": "doc2_p3",
+      "label": "不推荐句式",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_9",
+      "from": "doc2_p3",
+      "to": "doc2_p4",
+      "label": "要求",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_10",
+      "from": "root",
+      "to": "doc3",
+      "label": "了解代码结构时阅读",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_11",
+      "from": "doc3",
+      "to": "doc3_p1",
+      "label": "存在形式",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_12",
+      "from": "doc3_p1",
+      "to": "doc3_p2",
+      "label": "数据模型",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_13",
+      "from": "doc3_p2",
+      "to": "doc3_p3",
+      "label": "模块划分",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_14",
+      "from": "doc3_p3",
+      "to": "doc3_p4",
+      "label": "代码规则",
+      "mirrored": false
+    }
+  ],
+  "regions": [],
+  "viewport": {
+    "panX": -273.7468290851875,
+    "panY": 440.6300194973505,
+    "scale": 1.2017158915948796
+  }
+}

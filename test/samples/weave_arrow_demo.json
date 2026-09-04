@@ -1,0 +1,17 @@
+{
+    "viewport": { "panX": 224.0882505793087, "panY": 177.7906307969203, "scale": 1.5551513274358633 },
+    "nodes": [
+        { "id": "n_demo_src", "label": "源节点", "color": "blue", "x": 0, "y": 0, "desc": "普通节点", "w": 8.5, "h": 4 },
+        { "id": "n_demo_dst", "label": "目标节点", "color": "green", "x": 25, "y": 0, "desc": "箭头应朝右指向我", "w": 8.5, "h": 4 },
+        { "id": "n_demo_mir", "label": "镜像节点", "color": "orange", "x": 16, "y": 8, "mirrored": true, "desc": "从它出发的连线箭头应朝左", "w": 8.5, "h": 4 },
+        { "id": "n_demo_note", "label": "长笔记", "color": "yellow", "x": 0, "y": 11, "w": 15, "h": 6, "desc": "这是一段很长的笔记内容，用于验证省略号效果是否出现在文本最末尾。一二三四五六七八九十，ABCDEFGHIJKLMNOPQRSTUVWXYZ，这是第三行文字，这是第四行文字，这是第五行文字，最后这里应该出现省略号。" },
+        { "id": "n_demo_shortA", "label": "短", "color": "cyan", "x": 30, "y": 12, "mirrored": true, "desc": "短线", "w": 8.5, "h": 4 },
+        { "id": "n_demo_shortB", "label": "线", "color": "cyan", "x": 30, "y": 16, "desc": "短线目标", "w": 8.5, "h": 4 }
+    ],
+    "connections": [
+        { "id": "c_mtlyp47j_d2nifh9l", "from": "n_demo_src", "to": "n_demo_dst", "label": "", "mirrored": false },
+        { "id": "c_mtlyp47j_d3gvhllv", "from": "n_demo_src", "to": "n_demo_mir", "label": "", "mirrored": false },
+        { "id": "c_mtlyp47j_d4x9o1ip", "from": "n_demo_note", "to": "n_demo_shortA", "label": "", "mirrored": false },
+        { "id": "c_mtlyp47j_d5l0bbr4", "from": "n_demo_shortA", "to": "n_demo_shortB", "label": "", "mirrored": true }
+    ]
+}
