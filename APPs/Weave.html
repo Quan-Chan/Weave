@@ -634,7 +634,7 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.2</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.2.1</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -699,12 +699,15 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
        注意：内存中 x/y/w/h 均为世界像素；序列化存档的 x/y/w/h（节点与
        分区）与 collapse.dx/dy 统一为“格”单位（1px = 1/GRID_PX），加载时
        整体乘回像素。用户视角恒为格；系统内部一次换算后全为像素。
-     region    = { id, label, color, x, y, w, h }（可选，画框分区）
+     region    = { id, label, color, x, y, w, h, nodeIds, parentId }（可选，画框分区）
        - 分区是文档中的可见矩形：SVG 圆角矩形 + 顶部标签，位于连线层之下
-       - 分区内的节点 = 中心点位于分区矩形之内的节点（运行时纯几何判定，
-         无显式成员列表；节点拖进/拖出分区即自动归属/脱离）
-       - 移动分区时随动的连线 = 至少一端节点位于分区内的连线（仅单端在内时
-         另一端不动，曲线自适应）
+       - 分区内的节点由显式成员表 region.nodeIds 定义（本分区直属节点），
+         parentId 记录父分区（null = 顶级）。节点拖入/拖出、新建/克隆/粘贴
+         落入分区时自动维护该表（_syncNodeRegionMembership，按节点中心点
+         命中的最深分区归属，树形单归属）
+       - 移动分区时随动的节点 = 本分区及全部后代分区的 nodeIds 并集
+         （_regionAllNodeIds）；随动的连线 = 至少一端节点随动的连线
+       - 删除分区仅移除框体与 nodeIds，框内节点保留，子分区上提到父级
      collapse  = { hidden: [{id, dx, dy}, ...] }（可选，仅收起根携带）
        - dx/dy = 收起瞬间各隐藏节点相对根节点的偏移（内存为像素；序列化时
           与 x/y 同规则折算为格单位；相对位置保存，
@@ -1954,7 +1957,12 @@ Object.assign(App, {
   //命中 → 从所有分区 nodeIds 移除该 id 后加入命中分区（树形单归属）；
   //未命中（拖出所有分区）→ 从所有分区移除。拖拽结束与新建节点后调用。
   _syncNodeRegionMembership(nodeId) {
-    const n = this._getNodeById(nodeId);
+    //直接遍历查找而非 _getNodeById：新建/克隆节点刚入数组时
+    //_nodeByIdCache 可能已存在且不含该节点（缓存过期），会查不到。
+    let n = null;
+    for (let i = 0; i < this.canvasState.nodes.length; i++) {
+      if (this.canvasState.nodes[i].id === nodeId) { n = this.canvasState.nodes[i]; break; }
+    }
     if (!n) return;
     const { x: nx, y: ny, w, h } = Weave.Geom.getNodeRect(n);
     const target = this._regionAtPoint(nx + w / 2, ny + h / 2);
@@ -5204,6 +5212,9 @@ Object.assign(App, {
     this.selectedNodeIds.clear();
     this.selectedNodeIds.add(id);
     this._nodeZOrder.push(id);
+    //新建节点落位后同步分区归属（双击分区内建节点 → 加入该分区 nodeIds，
+    //否则移动分区时该节点不随动）。saveCanvasSnapshot 之前做。
+    this._syncNodeRegionMembership(id);
     this.saveCanvasSnapshot();
     this.renderCanvas();
     if (this._autoOpenModal) this.openNodeModal(id);
@@ -5644,6 +5655,8 @@ Object.assign(App, {
     const size = Weave.Geom.getNodeSize(src); c.w = size.w; c.h = size.h;
     this.canvasState.nodes.push(c);
     this._nodeZOrder.push(id);
+    //克隆节点落位后同步分区归属（粘贴副本落入分区 → 加入该分区 nodeIds）。
+    this._syncNodeRegionMembership(id);
     return id;
   },
 

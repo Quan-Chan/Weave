@@ -693,7 +693,7 @@
     {
       "name": "_syncNodeRegionMembership",
       "kind": "method",
-      "norm": "nodeId){constn=this._getNodeById(nodeId);if(!n)return;const{x:nx,y:ny,w,h}=Weave.Geom.getNodeRect(n);consttarget=this._regionAtPoint(nx+w/2,ny+h/2);letchanged=false;this.canvasState.regions.forEach(r=>{if(!Array.isArray(r.nodeIds))r.nodeIds=[];constids=r.nodeIds;constidx=ids.indexOf(nodeId);if(idx!==-1){if(!target||target.id!==r.id){ids.splice(idx,1);changed=true;}}});if(target&&target.nodeIds.indexOf(nodeId)===-1){target.nodeIds.push(nodeId);changed=true;}returnchanged;}"
+      "norm": "nodeId){letn=null;for(leti=0;i<this.canvasState.nodes.length;i++){if(this.canvasState.nodes[i].id===nodeId){n=this.canvasState.nodes[i];break;}}if(!n)return;const{x:nx,y:ny,w,h}=Weave.Geom.getNodeRect(n);consttarget=this._regionAtPoint(nx+w/2,ny+h/2);letchanged=false;this.canvasState.regions.forEach(r=>{if(!Array.isArray(r.nodeIds))r.nodeIds=[];constids=r.nodeIds;constidx=ids.indexOf(nodeId);if(idx!==-1){if(!target||target.id!==r.id){ids.splice(idx,1);changed=true;}}});if(target&&target.nodeIds.indexOf(nodeId)===-1){target.nodeIds.push(nodeId);changed=true;}returnchanged;}"
     },
     {
       "name": "_setRegionMode",
@@ -1283,7 +1283,7 @@
     {
       "name": "_addNodeAt",
       "kind": "method",
-      "norm": "worldX,worldY,asPosition){if(this.readOnly)return;constid=this._genId();letx,y;if(asPosition){x=this._snap(worldX);y=this._snap(worldY);}else{x=this._snap(worldX)-Math.round(NODE_W/2/GRID)*GRID;y=this._snap(worldY)-40;}this.canvasState.nodes.push({id,label:this.t('misc.newNode'),desc:'',color:this._selectedGenColor||'blue',x,y,mirrored:false,w:NODE_W,h:NODE_H});this.selectedNodeIds.clear();this.selectedNodeIds.add(id);this._nodeZOrder.push(id);this.saveCanvasSnapshot();this.renderCanvas();if(this._autoOpenModal)this.openNodeModal(id);returnid;}"
+      "norm": "worldX,worldY,asPosition){if(this.readOnly)return;constid=this._genId();letx,y;if(asPosition){x=this._snap(worldX);y=this._snap(worldY);}else{x=this._snap(worldX)-Math.round(NODE_W/2/GRID)*GRID;y=this._snap(worldY)-40;}this.canvasState.nodes.push({id,label:this.t('misc.newNode'),desc:'',color:this._selectedGenColor||'blue',x,y,mirrored:false,w:NODE_W,h:NODE_H});this.selectedNodeIds.clear();this.selectedNodeIds.add(id);this._nodeZOrder.push(id);this._syncNodeRegionMembership(id);this.saveCanvasSnapshot();this.renderCanvas();if(this._autoOpenModal)this.openNodeModal(id);returnid;}"
     },
     {
       "name": "_resetAddAnchor",
@@ -1423,7 +1423,7 @@
     {
       "name": "_cloneNode",
       "kind": "method",
-      "norm": "src,offsetX,offsetY){constid=this._genId();constc={id,label:src.label+' 副本',desc:src.desc,color:src.color,x:(src.x||0)+(offsetX||30),y:(src.y||0)+(offsetY||30),mirrored:!!src.mirrored};constsize=Weave.Geom.getNodeSize(src);c.w=size.w;c.h=size.h;this.canvasState.nodes.push(c);this._nodeZOrder.push(id);returnid;}"
+      "norm": "src,offsetX,offsetY){constid=this._genId();constc={id,label:src.label+' 副本',desc:src.desc,color:src.color,x:(src.x||0)+(offsetX||30),y:(src.y||0)+(offsetY||30),mirrored:!!src.mirrored};constsize=Weave.Geom.getNodeSize(src);c.w=size.w;c.h=size.h;this.canvasState.nodes.push(c);this._nodeZOrder.push(id);this._syncNodeRegionMembership(id);returnid;}"
     },
     {
       "name": "_enterNodeInlineEdit",
