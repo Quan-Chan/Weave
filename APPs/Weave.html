@@ -160,7 +160,7 @@ stroke-width 过渡：缩放时它会让线宽滞后于几何 150ms 造成粗细
   其几何按 1/scale 反向缩放（applyViewTransform 写入），抵消父容器的 scale。*/
 .node-layer{position:absolute;top:0;left:0}
 #nodeLayerMain{z-index:1}
-#linesSvgHl{z-index:2}
+#linesSvgHl{z-index:2;transform-origin:0 0}
 #nodeLayerHl{z-index:3}
 .canvas.hl-blur #nodeLayerMain{filter:blur(var(--hl-blur))}
 .node-layer{position:absolute;top:0;left:0}
@@ -3057,7 +3057,7 @@ Object.assign(App, {
             '<svg class="lines-svg" id="linesSvg" style="overflow:visible"></svg>' +
             '<div class="canvas-nodes" id="canvasNodes">' +
               '<div class="node-layer" id="nodeLayerMain"></div>' +
-              '<svg class="lines-svg hl-lift-svg" id="linesSvgHl" style="overflow:visible"></svg>' +
+              '<svg class="lines-svg hl-lift-svg" id="linesSvgHl" width="1" height="1" style="overflow:visible"></svg>' +
               '<div class="node-layer" id="nodeLayerHl"></div>' +
             '</div>' +
             '<svg class="curve-overlay" id="curveOverlay" width="1" height="1" style="overflow:visible"></svg>' +

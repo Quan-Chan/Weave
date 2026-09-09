@@ -268,7 +268,21 @@ const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if 
     const r = document.getElementById('canvasStage').getBoundingClientRect();
     const x = r.left + pt.x + App.panX, y = r.top + pt.y + App.panY;
     const before = document.elementFromPoint(x, y);
+    //高亮前后连线几何必须一致：抬升层反向缩放绕容器原点，不得产生偏移
+    const boxes = () => {
+      const out = {};
+      for (const c of App.canvasState.connections) {
+        const p = App._visPathByKey.get(c.id);
+        const r = p.getBoundingClientRect();
+        out[c.id] = [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)];
+      }
+      return out;
+    };
+    const geoBefore = boxes();
     App._highlightAtNode('B');
+    const geoAfter = boxes();
+    const geoDelta = Math.max(...Object.keys(geoBefore).map(k =>
+      Math.max(...geoBefore[k].map((v, i) => Math.abs(v - geoAfter[k][i])))));
     const after = document.elementFromPoint(x, y);
     const lift = document.querySelector('.conn-group.hl-lift');
     //高亮节点的连接点中心：连接点必须盖住连线（与未高亮时一致）
@@ -280,7 +294,8 @@ const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if 
       afterInHlSvg: !!(after && after.closest && after.closest('#linesSvgHl')),
       liftParent: lift && lift.parentNode ? lift.parentNode.id : null,
       atSocket: atSocket ? (atSocket.getAttribute('class') || atSocket.tagName) : null,
-      layers: [...document.querySelectorAll('#canvasNodes > *')].map(el => el.id)
+      layers: [...document.querySelectorAll('#canvasNodes > *')].map(el => el.id),
+      geoDelta
     };
   });
   console.log('crossing:', JSON.stringify(cross));
@@ -288,6 +303,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if 
   ok(cross.liftParent === 'linesSvgHl', '抬升组位于抬升层 SVG (' + cross.liftParent + ')');
   ok(cross.layers.join(',') === 'nodeLayerMain,linesSvgHl,nodeLayerHl', '层序为 主层 → 抬升层 → 高亮节点层 (' + cross.layers.join(',') + ')');
   ok(/socket/.test(cross.atSocket), '高亮节点连接点盖住连线（命中 ' + cross.atSocket + '）');
+  ok(cross.geoDelta <= 1, '高亮前后连线几何一致（最大偏差 ' + cross.geoDelta + 'px）');
 
   console.log(fails === 0 ? '✅ 关联高亮冒烟全部通过' : '❌ 存在 ' + fails + ' 项失败');
   await browser.close();
