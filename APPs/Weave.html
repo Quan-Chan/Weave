@@ -101,13 +101,15 @@ html,body{height:100vh;overflow:hidden;font-family:'Inter',-apple-system,BlinkMa
     canvas#gridCvs   — 网格线绘制于屏幕像素空间（无缩放伪影）
     .canvas-world   — transform: translate(panX, panY)，仅平移（GPU 合成平移）
       svg#linesSvg   — 不加任何 transform（否则会被缓存为纹理 → 模糊）
-      svg#linesSvgHl — 关联高亮抬升层：坐标同 linesSvg，z-index 高于节点层
         g.conn-group → g.lines / g.labels
           path.line — d 属性保存（预先缩放的）屏幕坐标（缩放时重新渲染）；
                        stroke-width 以属性写入 = 系数 × scale（2.5/3.5/4，见 _renderConnection）
           text.line-label — x/y/font-size 均已预缩放（缩放时重新渲染）
       .canvas-nodes — transform: scale(scale) → 缩放变化时重渲染以保证文字清晰
-        .node       — transform: translate(nodeX, nodeY) 世界坐标*/
+        .node-layer#nodeLayerMain — 普通节点（关联高亮时整体模糊）
+        svg#linesSvgHl — 关联高亮抬升层：坐标同 linesSvg，自身按 1/scale 反向缩放
+        .node-layer#nodeLayerHl  — 高亮节点（清晰，其连接点盖住连线）
+          .node     — transform: translate(nodeX, nodeY) 世界坐标*/
 
 .canvas{contain:layout style paint;position:relative;overflow:hidden;cursor:default;user-select:none;flex:1;min-height:0;background-color:#f8f9fb}
 #gridCvs{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
@@ -153,9 +155,13 @@ stroke-width 过渡：缩放时它会让线宽滞后于几何 150ms 造成粗细
 .canvas.hl-blur #regionsSvg,
 .canvas.hl-blur #regionLabels{filter:blur(calc(var(--hl-blur) * var(--hl-scale)))}
 .canvas.hl-blur #linesSvg>.conn-group:not(.hl-lift){filter:blur(calc(var(--hl-blur) * var(--hl-scale)))}
-/*关联高亮抬升层：高亮连线的专用 SVG，位于节点层之上（z-index 3 > .canvas-nodes 的 2），
-  使连线与其文字盖过所有节点，不被未高亮的节点遮住。*/
-.hl-lift-svg{z-index:3}
+/*关联高亮抬升层：#canvasNodes 内的第三层，叠在非高亮节点层之上、高亮节点层之下，
+  使高亮连线盖过被模糊的节点，同时仍位于高亮节点的连接点之下。
+  其几何按 1/scale 反向缩放（applyViewTransform 写入），抵消父容器的 scale。*/
+.node-layer{position:absolute;top:0;left:0}
+#nodeLayerMain{z-index:1}
+#linesSvgHl{z-index:2}
+#nodeLayerHl{z-index:3}
 .canvas.hl-blur #nodeLayerMain{filter:blur(var(--hl-blur))}
 .node-layer{position:absolute;top:0;left:0}
 .coord{position:absolute;bottom:6px;left:6px;z-index:50;font-size:12.5px;color:var(--text-muted);background:var(--bg-card);padding:5px 9px;border-radius:4px;border:1px solid var(--border);font-family:'Inter',monospace;user-select:none;line-height:1.4;cursor:pointer}
@@ -2658,6 +2664,10 @@ Object.assign(App, {
     //第 2 步 缩放：transform 的 scale，创建新的合成器图层
     const nodesC = this._getEl('canvasNodes');
     if (nodesC) nodesC.style.transform = 'scale(' + this.scale + ')';
+    //高亮抬升层位于节点容器内：按 1/scale 反向缩放，抵消父容器缩放，
+    //使其预乘 scale 的屏幕坐标保持 1:1。
+    const hlSvg = this._getEl('linesSvgHl');
+    if (hlSvg) hlSvg.style.transform = 'scale(' + (1 / this.scale) + ')';
 
     //第 3 步 变化大于 3% → 强制重新光栅化以保持节点文字清晰
     const scaleDiff = Math.abs(this.scale - this._lastRenderScale);
@@ -3047,9 +3057,9 @@ Object.assign(App, {
             '<svg class="lines-svg" id="linesSvg" style="overflow:visible"></svg>' +
             '<div class="canvas-nodes" id="canvasNodes">' +
               '<div class="node-layer" id="nodeLayerMain"></div>' +
+              '<svg class="lines-svg hl-lift-svg" id="linesSvgHl" style="overflow:visible"></svg>' +
               '<div class="node-layer" id="nodeLayerHl"></div>' +
             '</div>' +
-            '<svg class="lines-svg hl-lift-svg" id="linesSvgHl" style="overflow:visible"></svg>' +
             '<svg class="curve-overlay" id="curveOverlay" width="1" height="1" style="overflow:visible"></svg>' +
           '</div>' +
           '<div class="sel-overlay" id="boxSelectOverlay" style="display:none;"></div>' +

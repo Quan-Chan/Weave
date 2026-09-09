@@ -271,19 +271,23 @@ const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if 
     App._highlightAtNode('B');
     const after = document.elementFromPoint(x, y);
     const lift = document.querySelector('.conn-group.hl-lift');
+    //高亮节点的连接点中心：连接点必须盖住连线（与未高亮时一致）
+    const sock = App._nodeElMap.get('B').querySelector('.socket.out').getBoundingClientRect();
+    const atSocket = document.elementFromPoint(sock.left + sock.width / 2, sock.top + sock.height / 2);
     return {
       beforeEl: before ? (before.getAttribute('class') || before.tagName) : null,
       afterEl: after ? (after.getAttribute('class') || after.tagName) : null,
       afterInHlSvg: !!(after && after.closest && after.closest('#linesSvgHl')),
       liftParent: lift && lift.parentNode ? lift.parentNode.id : null,
-      zHl: getComputedStyle(document.getElementById('linesSvgHl')).zIndex,
-      zNodes: getComputedStyle(document.getElementById('canvasNodes')).zIndex
+      atSocket: atSocket ? (atSocket.getAttribute('class') || atSocket.tagName) : null,
+      layers: [...document.querySelectorAll('#canvasNodes > *')].map(el => el.id)
     };
   });
   console.log('crossing:', JSON.stringify(cross));
-  ok(cross.afterInHlSvg, '高亮连线盖过节点（命中元素来自抬升层，实际 ' + cross.afterEl + '）');
-  ok(cross.liftParent === 'linesSvgHl', '抬升组位于顶层连线 SVG (' + cross.liftParent + ')');
-  ok(Number(cross.zHl) > Number(cross.zNodes), '抬升层 z-index 高于节点层 (' + cross.zHl + ' > ' + cross.zNodes + ')');
+  ok(cross.afterInHlSvg, '高亮连线盖过被模糊的节点（命中元素来自抬升层，实际 ' + cross.afterEl + '）');
+  ok(cross.liftParent === 'linesSvgHl', '抬升组位于抬升层 SVG (' + cross.liftParent + ')');
+  ok(cross.layers.join(',') === 'nodeLayerMain,linesSvgHl,nodeLayerHl', '层序为 主层 → 抬升层 → 高亮节点层 (' + cross.layers.join(',') + ')');
+  ok(/socket/.test(cross.atSocket), '高亮节点连接点盖住连线（命中 ' + cross.atSocket + '）');
 
   console.log(fails === 0 ? '✅ 关联高亮冒烟全部通过' : '❌ 存在 ' + fails + ' 项失败');
   await browser.close();
