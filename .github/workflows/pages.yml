@@ -1,7 +1,7 @@
 name: Deploy Pages
 
-# 站点根目录的 index.html 由 APPs/Weave.html 复制而来（构建产物，源树不保存副本）。
-# 每次 main 收到推送即重新部署，在线版与仓库主程序保持一致。
+# 站点根目录的 index.html 由 APPs/Weave.min.html 复制而来（构建产物，源树不保存副本）。
+# 压缩版与主程序功能一致，传输体积更小；每次 main 收到推送即重新部署。
 on:
   push:
     branches: [ main ]
@@ -25,7 +25,7 @@ jobs:
       - name: 组装站点产物
         run: |
           mkdir -p _site
-          cp APPs/Weave.html _site/index.html
+          cp APPs/Weave.min.html _site/index.html
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

@@ -10,9 +10,10 @@
   <img src="gif/usage.gif" alt="Weave usage demo" width="720">
 </p>
 
-1. **Download** — download `APPs/Weave.html`, the only application file; no installation needed
-2. **Open** — open it in any modern browser (Chrome / Edge / Firefox / Safari)
-3. **Use** — double-click the canvas to create a node, drag sockets to connect nodes, double-click text to edit it inline
+1. **Use online** — open [quan-chan.github.io/Weave](https://quan-chan.github.io/Weave/) and use it directly; no download needed
+2. **Download** — download `APPs/Weave.html`, the only application file; no installation needed
+3. **Open** — open it in any modern browser (Chrome / Edge / Firefox / Safari)
+4. **Use** — double-click the canvas to create a node, drag sockets to connect nodes, double-click text to edit it inline
 
 <hr>
 

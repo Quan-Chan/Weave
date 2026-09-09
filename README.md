@@ -12,9 +12,10 @@
   <img src="gif/usage.gif" alt="Weave 使用演示" width="720">
 </p>
 
-1. **下载** — 下载 `APPs/Weave.html`，这是唯一的应用文件，不需要安装
-2. **打开** — 用任意现代浏览器（Chrome / Edge / Firefox / Safari）打开文件
-3. **使用** — 双击画布生成节点，拖拽 socket 连接节点，双击文字即改即得
+1. **在线使用** — 打开 [quan-chan.github.io/Weave](https://quan-chan.github.io/Weave/) 直接使用，无需下载
+2. **下载** — 下载 `APPs/Weave.html`，这是唯一的应用文件，不需要安装
+3. **打开** — 用任意现代浏览器（Chrome / Edge / Firefox / Safari）打开文件
+4. **使用** — 双击画布生成节点，拖拽 socket 连接节点，双击文字即改即得
 
 <hr>
 
