@@ -59,8 +59,10 @@ jobs:
         run: npm test
 
       # 失败时归档截图,便于人工定位(GUI 测试各步截图到 test/shots*/)
+      # 归档属诊断产物:存储配额占满时上传失败不应中断 CI(日志中仍可见失败)
       - name: 归档测试截图(即使失败)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: test-shots

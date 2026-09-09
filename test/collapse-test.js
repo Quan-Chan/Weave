@@ -2,7 +2,7 @@
 // 收起/展开节点串功能测试 — puppeteer-core + 系统 Edge 无头。
 // 覆盖：需求 1（点击收起/再点击展开）、需求 2（相对位置保存）、
 //       需求 3（嵌套收起 & 多父冲突禁止）、需求 4（悬停 ± 徽标）、
-//       需求 5（PNG 导出含收起呈现、无 ± 徽标）。
+//       需求 5（PNG 导出含收起呈现与 ± 徽标）。
 // 用法: node test/collapse-test.js [--headed]
 const puppeteer = require('puppeteer-core');
 const path = require('path');
@@ -182,7 +182,7 @@ const shot = async (page, name) => {
   await sleep(300);
   await shot(page, '04_root_moved');
 
-  // ── 微调回归：折叠态拖拽连接点 → 徽标必须隐藏（.dragging 特异性） ──
+  // ── 微调回归：折叠态拖拽连接点 → 徽标保持显示，socket 仅放大 ──
   const aOutNow = await sck('x_A', 'out');
   await page.mouse.move(aOutNow.x, aOutNow.y);
   await page.mouse.down();
@@ -191,14 +191,20 @@ const shot = async (page, name) => {
   const dragBadge = await page.evaluate(() => {
     const el = App._nodeElMap.get('x_A');
     const fold = el.querySelector('.socket-fold');
+    const inner = el.querySelector('.socket.out .socket-inner');
+    const sock = el.querySelector('.socket.out');
     return {
       display: getComputedStyle(fold).display,
+      innerDisplay: getComputedStyle(inner).display,
+      scale: +new DOMMatrixReadOnly(getComputedStyle(sock).transform).a.toFixed(3),
       dragging: !!document.querySelector('.socket.dragging')
     };
   });
   console.log('micro-drag:', JSON.stringify(dragBadge));
   if (!dragBadge.dragging) fail('微调回归: 拖拽态未建立');
-  if (dragBadge.display !== 'none') fail('微调回归: 拖拽态下徽标应隐藏, got ' + dragBadge.display);
+  if (dragBadge.display === 'none') fail('微调回归: 拖拽态下徽标应保持显示, got ' + dragBadge.display);
+  if (dragBadge.innerDisplay === 'block') fail('微调回归: 拖拽态下中心圆点不应显示（徽标替换圆点）');
+  if (Math.abs(dragBadge.scale - 1.6) > 0.01) fail('微调回归: 拖拽态 socket 应放大 1.6×, got ' + dragBadge.scale);
   await page.mouse.up();
   await sleep(250);
 
@@ -304,8 +310,10 @@ const shot = async (page, name) => {
   console.log('PNG saved -> ' + pngPath + ' (' + pngBuf.length + ' bytes)');
   const snapCheck = await page.evaluate(() => {
     const snap = App._buildExportSnapshot();
+    const liveBadges = document.querySelectorAll('.socket.out.fold-avail .socket-fold, .socket.out.fold-on .socket-fold').length;
     return {
       liveFolds: document.querySelectorAll('.socket-fold').length,
+      liveBadges,
       snapBadges: snap.querySelectorAll('.socket.out.fold-avail .socket-fold, .socket.out.fold-on .socket-fold').length,
       snapInners: snap.querySelectorAll('.socket .socket-inner').length,
       liveHidden: document.querySelectorAll('.node.collapse-hidden').length,
@@ -313,9 +321,52 @@ const shot = async (page, name) => {
     };
   });
   console.log('snapshot check:', JSON.stringify(snapCheck));
-  if (snapCheck.snapBadges !== 0) fail('需求5b: 导出快照不应含 ± 徽标: ' + JSON.stringify(snapCheck));
+  if (snapCheck.liveBadges === 0) fail('需求5b: 画布应存在 ± 徽标供导出比对: ' + JSON.stringify(snapCheck));
+  if (snapCheck.snapBadges !== snapCheck.liveBadges) fail('需求5b: 导出快照的 ± 徽标应与画布一致: ' + JSON.stringify(snapCheck));
   if (snapCheck.snapInners === 0) fail('需求5c: 导出快照应保留连接点圆点');
   if (snapCheck.snapHidden !== 0) fail('需求5a: 导出快照不应含收起节点');
+
+  // ── 需求5d/5e：导出 PNG 像素中，带徽标的连接点中心与常规圆点不同 ──
+  // B 已收起（+ 徽标）、E 因多父冲突无徽标（中心圆点）；两者节点色不同，各自按本节点色统计。
+  // 连接点中心 8×8 区域内的节点色像素数：圆点填满该区域，徽标只占细线。
+  const sampleSockets = (b64, includeConnControls) => page.evaluate(async (b64, inc) => {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = 'data:image/png;base64,' + b64; });
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+    const c2 = cv.getContext('2d'); c2.drawImage(img, 0, 0);
+    const b = App._computeContentBounds(inc);
+    const pad = 40;
+    const k = img.width / (b.maxX - b.minX + pad * 2);
+    const colorCount = (nodeId) => {
+      const n = App._getNodeById(nodeId);
+      const a = Weave.Geom.getSocketAnchor(n, 'out');
+      const want = Weave.Color.hexToRgb(App._resolveColor(n.color).hex);
+      const X = Math.round((a.x - (b.minX - pad)) * k), Y = Math.round((a.y - (b.minY - pad)) * k);
+      const d = c2.getImageData(X - 4, Y - 4, 8, 8).data;
+      let cnt = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] > 128 && Math.abs(d[i] - want.r) < 40 && Math.abs(d[i + 1] - want.g) < 40 && Math.abs(d[i + 2] - want.b) < 40) cnt++;
+      }
+      return cnt;
+    };
+    return { badge: colorCount('x_B'), plain: colorCount('x_E'), w: img.width, h: img.height };
+  }, b64, includeConnControls);
+
+  const exportPx = await sampleSockets(b64, true);
+  console.log('export pixels:', JSON.stringify(exportPx));
+  if (!(exportPx.plain > 30)) fail('需求5d: 常规连接点中心应为实心圆点: ' + JSON.stringify(exportPx));
+  if (!(exportPx.badge < exportPx.plain)) fail('需求5d: 导出 PNG 中徽标连接点中心不应为实心圆点: ' + JSON.stringify(exportPx));
+
+  // 需求5e：旧版重绘路径（foreignObject 不可用的引擎）同样绘制 ± 徽标
+  await page.evaluate(() => { window.__dl = null; });
+  await page.evaluate(() => { App._exportPNGLegacy(); });
+  await sleep(500);
+  const legacyB64 = await page.evaluate(() => (window.__dl && String(window.__dl.href).indexOf('data:image/png') === 0) ? window.__dl.href.split(',')[1] : null);
+  if (!legacyB64) fail('需求5e: 旧版导出未触发下载');
+  const legacyPx = await sampleSockets(legacyB64, false);
+  console.log('legacy export pixels:', JSON.stringify(legacyPx));
+  if (!(legacyPx.plain > 30)) fail('需求5e: 旧版导出常规连接点中心应为实心圆点: ' + JSON.stringify(legacyPx));
+  if (!(legacyPx.badge < legacyPx.plain)) fail('需求5e: 旧版导出徽标连接点中心不应为实心圆点: ' + JSON.stringify(legacyPx));
 
   // ── 需求4 补充：叶子 C 悬停无徽标 ──
   await page.evaluate(() => { App.toggleCollapse('x_B'); }); await sleep(350);

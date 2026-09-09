@@ -80,6 +80,10 @@ if [ $? -ne 0 ]; then echo "❌ 结构/单测未通过,禁止提交"; exit 1; fi
 | fold-click-badge-test.js | 回归 | fold 渲染族1: 徽标点击/拖拽显隐 | 改 socket/fold 渲染后 |
 | fold-flush-sync-test.js | 回归 | fold 渲染族2: 收起可见性同步 | 同上 |
 | fold-zoom-twitch-test.js | 回归 | fold 渲染族3: 缩放无抽搐 | 同上 |
+| hl-smoke.js | 专项 | 关联高亮(高亮集合/抬升/背景模糊/清除还原) | 改关联高亮后 |
+| hl-keybind-test.js | 专项 | 关联高亮键位自定义(改绑后手势切换) | 改键位/关联高亮后 |
+| hl-keybind-ui-test.js | 专项 | 设置弹窗中关联高亮键位的录制/显示/重置 | 同上 |
+| snap-reset-test.js | 专项 | 对齐设置重置(方法调用 + UI 点击双路径) | 改对齐设置后 |
 | node-drag-snap-test.js | 专项 | 节点拖拽吸附动画/监听泄漏 | 改吸附/动画后 |
 | undo-cap-test.js | 专项 | 撤销栈 50 步上限 | 改 undo/历史后 |
 | repro-bugs.js | 回归 | 三个历史 bug 不再复现 | 改 collapse/导入/手势后 |

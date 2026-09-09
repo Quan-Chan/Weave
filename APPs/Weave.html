@@ -101,6 +101,7 @@ html,body{height:100vh;overflow:hidden;font-family:'Inter',-apple-system,BlinkMa
     canvas#gridCvs   — 网格线绘制于屏幕像素空间（无缩放伪影）
     .canvas-world   — transform: translate(panX, panY)，仅平移（GPU 合成平移）
       svg#linesSvg   — 不加任何 transform（否则会被缓存为纹理 → 模糊）
+      svg#linesSvgHl — 关联高亮抬升层：坐标同 linesSvg，z-index 高于节点层
         g.conn-group → g.lines / g.labels
           path.line — d 属性保存（预先缩放的）屏幕坐标（缩放时重新渲染）；
                        stroke-width 以属性写入 = 系数 × scale（2.5/3.5/4，见 _renderConnection）
@@ -140,6 +141,23 @@ stroke-width 过渡：缩放时它会让线宽滞后于几何 150ms 造成粗细
 /*选中 / 悬停：仅加粗光晕——不改变 font-size。基础 font-size 以 SVG 属性（10 * scale）在 _doRenderLines 中设置，使标签随缩放同步（与节点文字一致）。此处的 CSS font-size 会覆盖该属性并破坏缩放联动（标签保持固定大小，而其他元素都在缩放）。*/
 .line-label.selected,
 .line-label.hover{stroke-width:2px}
+/*关联高亮（按住 Alt 单击节点）：被抬起的节点与其连线保持清晰，其余内容加轻微模糊。
+  半径为世界像素：节点层位于 scale 容器内，直接取该值；网格、连线与分区都在屏幕
+  像素空间（网格按像素绘制，连线/分区几何已预乘 scale），故乘 --hl-scale 折算。
+  --hl-scale 在高亮期间由 applyViewTransform 写入。
+  节点分两层：#nodeLayerMain 承载其余节点（整体一次模糊），#nodeLayerHl 承载被
+  抬起的节点（保持清晰）。两层都是 #canvasNodes 的子元素，节点事件仍由该元素上
+  的委托处理器接住。*/
+.canvas{--hl-blur:1.2px;--hl-scale:1}
+.canvas.hl-blur #gridCvs{filter:blur(calc(var(--hl-blur) * var(--hl-scale)))}
+.canvas.hl-blur #regionsSvg,
+.canvas.hl-blur #regionLabels{filter:blur(calc(var(--hl-blur) * var(--hl-scale)))}
+.canvas.hl-blur #linesSvg>.conn-group:not(.hl-lift){filter:blur(calc(var(--hl-blur) * var(--hl-scale)))}
+/*关联高亮抬升层：高亮连线的专用 SVG，位于节点层之上（z-index 3 > .canvas-nodes 的 2），
+  使连线与其文字盖过所有节点，不被未高亮的节点遮住。*/
+.hl-lift-svg{z-index:3}
+.canvas.hl-blur #nodeLayerMain{filter:blur(var(--hl-blur))}
+.node-layer{position:absolute;top:0;left:0}
 .coord{position:absolute;bottom:6px;left:6px;z-index:50;font-size:12.5px;color:var(--text-muted);background:var(--bg-card);padding:5px 9px;border-radius:4px;border:1px solid var(--border);font-family:'Inter',monospace;user-select:none;line-height:1.4;cursor:pointer}
 .coord .coord-val{display:inline;outline:none;user-select:text;cursor:text;border-radius:3px;padding:1px 3px;min-width:1em}
 .coord .coord-val:focus{background:transparent;border:1px solid var(--border);outline:1px solid rgba(59,130,246,.55);outline-offset:0;margin:-1px}
@@ -168,7 +186,8 @@ stroke-width 过渡：缩放时它会让线宽滞后于几何 150ms 造成粗细
 .regions-svg .region-rsz-handle{pointer-events:all;cursor:nwse-resize}
 .regions-svg .region-rsz-handle[data-dir="nw"],.regions-svg .region-rsz-handle[data-dir="se"]{cursor:nwse-resize}
 .regions-svg .region-rsz-handle[data-dir="ne"],.regions-svg .region-rsz-handle[data-dir="sw"]{cursor:nesw-resize}
-/*分区创建预览（屏幕坐标 overlay）：粗线 + 浅填充，与 .sel-overlay 的虚线框选区分*/
+/*分区创建预览（屏幕坐标 overlay）：粗线 + 浅填充，与 .sel-overlay 的虚线框选区分。
+  颜色由 _applyRegionPreviewColor 按顶栏生成色以内联样式写入；此处为初始值。*/
 .region-preview{position:absolute;border:2px solid var(--accent);background:rgba(59,130,246,.07);pointer-events:none;z-index:100}
 /*分区创建模式（Region 键 / 顶栏按钮）下的画布光标提示*/
 .canvas.region-mode{cursor:crosshair}
@@ -281,7 +300,6 @@ GPU 渲染中会让圆环像素分布不均（下半部分/一侧多出抗锯齿
 .socket-fold.fold-plus .fold-v{display:block}
 .socket.out.fold-avail .socket-fold,.socket.out.fold-on .socket-fold{display:block}
 .socket.out.fold-avail .socket-inner,.socket.out.fold-on .socket-inner{display:none}
-.socket.dragging .socket-fold{display:none!important}
 /*hover-lock：_forceRerender 重插节点容器期间，浏览器会短暂清除 :hover（缩放时
 socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket 加本类冻结视觉状态，
 下一帧浏览器重新命中测试后解除——视觉上无任何中断。与 :hover 规则同特异性，
@@ -593,6 +611,9 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
             </div>
             <label class="switch"><input type="checkbox" id="setSnapRegionSize"><span class="track"></span><span class="thumb"></span></label>
           </div>
+          <div class="set-reset">
+            <button class="btn btn-secondary" id="btnResetSnap" data-i18n="set.resetSnap">重置对齐设置</button>
+          </div>
           <div class="setting-row">
             <div class="s-label">
               <div class="s-title" data-i18n="set.language">语言</div>
@@ -626,6 +647,7 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
             <div class="key-row"><span class="key-desc" data-i18n="set.autoModal">新建自动打开详情</span><input class="help-key" type="text" data-kb="autoModal" value="Ctrl+E" readonly></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.chrome">隐藏 / 显示界面</span><input class="help-key" type="text" data-kb="chrome" value="Ctrl+H" readonly></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.region">画分区</span><input class="help-key" type="text" data-kb="region" value="Shift+R" readonly></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.hlNode">高亮关联节点</span><input class="help-key" type="text" data-kb="hlNode" value="Alt" readonly></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.delKey">删除选中</span><input class="help-key" type="text" data-kb="delete" value="Delete" readonly></div>
             <div class="set-reset"><button class="btn btn-secondary" id="btnResetKeybinds" data-i18n="set.resetKeys">重置键位</button></div>
           </div>
@@ -634,7 +656,7 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.2.1</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.3</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -850,17 +872,19 @@ const I18N = {
     'set.kv.socket': '拖拽节点连接点', 'set.kv.dblTitle': '双击标题',
     'set.kv.ctxMenu': '右键', 'set.kv.box': 'Shift + 拖拽',
     'set.kv.region': '画分区 / Alt + 拖拽',
+    'set.kv.hlNode': '按住 Alt + 点击节点',
     'set.kv.middle': '长按中键拖拽', 'set.kv.wheel': '滚轮', 'set.kv.colorCycle': 'Ctrl + 滚轮',
     'set.dblclick': '生成新节点', 'set.dragNode': '移动节点',
     'set.socket': '创建连线', 'set.dblTitle': '编辑文字',
     'set.ctxMenu': '节点更多操作', 'set.box': '框选多个节点',
     'set.region': '框出一个区域',
+    'set.hlNode': '高亮关联节点',
     'set.middle': '无交互移动画布',
     'set.wheel': '缩放画布', 'set.colorCycle': '切换节点颜色',
     'set.undo': '撤销', 'set.redo': '重做', 'set.selectAll': '全选',
     'set.copy': '复制', 'set.paste': '粘贴', 'set.autoModal': '新建自动打开详情',
     'set.chrome': '隐藏 / 显示界面', 'set.delKey': '删除选中',
-    'set.resetKeys': '重置键位',
+    'set.resetKeys': '重置键位', 'set.resetSnap': '重置对齐设置',
     // 通知（toast）
     'toast.readonlyUndo': '只读模式无法撤销', 'toast.noUndo': '没有可撤销的操作', 'toast.undone': '已撤销',
     'toast.readonlyRedo': '只读模式无法重做', 'toast.noRedo': '没有可重做的操作', 'toast.redone': '已重做',
@@ -885,7 +909,8 @@ const I18N = {
     'toast.readonlyOn': '已切换至只读模式', 'toast.readonlyOff': '已切换至编辑模式',
     'toast.chromeHidden': '已隐藏界面（Ctrl+H 恢复）', 'toast.chromeShown': '已显示界面',
     'toast.keybindSaved': '快捷键已更新', 'toast.keybindConflict': '该快捷键已被其他操作使用',
-    'toast.keysReset': '键位已重置为默认',
+    'toast.modOnlyHlNode': '纯修饰键仅支持"高亮关联节点"手势动作',
+    'toast.keysReset': '键位已重置为默认', 'toast.snapReset': '对齐设置已重置为默认',
     // 其他
     'misc.newNode': '新节点', 'misc.region': '分区', 'misc.statusBadge': '{nodes} 节点 · {conns} 连线',
     'misc.color.blue': '蓝色', 'misc.color.cyan': '青色', 'misc.color.green': '绿色',
@@ -926,17 +951,19 @@ const I18N = {
     'set.kv.socket': 'Drag a node connection point', 'set.kv.dblTitle': 'Double-click title',
     'set.kv.ctxMenu': 'Right-click', 'set.kv.box': 'Shift + drag',
     'set.kv.region': 'Draw region / Alt + drag',
+    'set.kv.hlNode': 'Hold Alt + click a node',
     'set.kv.middle': 'Hold & drag with middle button', 'set.kv.wheel': 'Wheel', 'set.kv.colorCycle': 'Ctrl + wheel',
     'set.dblclick': 'to create a node', 'set.dragNode': 'to move it',
     'set.socket': 'to create a connection', 'set.dblTitle': 'to edit text',
     'set.ctxMenu': 'more actions for a node', 'set.box': 'to box-select nodes',
     'set.region': 'to draw a region',
+    'set.hlNode': 'to highlight linked nodes',
     'set.middle': 'to pan without interacting',
     'set.wheel': 'to zoom', 'set.colorCycle': 'to cycle node colors',
     'set.undo': 'Undo', 'set.redo': 'Redo', 'set.selectAll': 'Select all',
     'set.copy': 'Copy', 'set.paste': 'Paste', 'set.autoModal': 'Auto-open details for new nodes',
     'set.chrome': 'Toggle UI chrome', 'set.delKey': 'Delete selection',
-    'set.resetKeys': 'Reset keybindings',
+    'set.resetKeys': 'Reset keybindings', 'set.resetSnap': 'Reset alignment settings',
     'toast.readonlyUndo': 'Cannot undo in read-only mode', 'toast.noUndo': 'Nothing to undo', 'toast.undone': 'Undone',
     'toast.readonlyRedo': 'Cannot redo in read-only mode', 'toast.noRedo': 'Nothing to redo', 'toast.redone': 'Redone',
     'toast.invalidFile': 'Invalid save file', 'toast.importOk': 'Imported successfully',
@@ -960,7 +987,8 @@ const I18N = {
     'toast.readonlyOn': 'Read-only mode on', 'toast.readonlyOff': 'Edit mode on',
     'toast.chromeHidden': 'UI hidden (Ctrl+H to restore)', 'toast.chromeShown': 'UI shown',
     'toast.keybindSaved': 'Shortcut updated', 'toast.keybindConflict': 'Shortcut already in use by another action',
-    'toast.keysReset': 'Keybindings reset to defaults',
+    'toast.modOnlyHlNode': 'Modifier-only keys are only supported for "highlight linked nodes"',
+    'toast.keysReset': 'Keybindings reset to defaults', 'toast.snapReset': 'Alignment settings reset to defaults',
     'misc.newNode': 'New node', 'misc.region': 'Region', 'misc.statusBadge': '{nodes} nodes · {conns} connections',
     'misc.color.blue': 'Blue', 'misc.color.cyan': 'Cyan', 'misc.color.green': 'Green',
     'misc.color.yellow': 'Yellow', 'misc.color.orange': 'Orange',
@@ -1581,20 +1609,19 @@ const App = window.App = {
   readOnly: false,
   _autoOpenModal: false,
   /*设置（持久化到 localStorage）：
-    _snapNodes —— 拖拽/添加时节点位置吸附到 20px 网格
-      （默认开 = 历史行为）。关闭时位置保持
+    4 个对齐设置默认全部开启（常规页提供"重置对齐设置"一键恢复开启）。
+    _snapNodes —— 拖拽/添加时节点位置吸附到 20px 网格。关闭时位置保持
       像素精度（最小 1px = 1/20 网格单位）。
-    _snapSize —— 调整大小时节点尺寸吸附到 20px 网格步长
-      （默认关 = 历史 1px 粒度）。开启时尺寸
-      粒度强制为一个网格单元格（20px）。*/
+    _snapSize —— 调整大小时节点尺寸吸附到 20px 网格步长。关闭时尺寸
+      保持 1px 粒度（历史行为）。*/
   _snapNodes: true,
-  _snapSize: false,
-  /*_snapRegionPos —— 分区框位置（创建落点 + 拖动）吸附到 20px 网格
-    （默认开，同 _snapNodes）。关闭后保持 1px 像素精度。
+  _snapSize: true,
+  /*_snapRegionPos —— 分区框位置（创建落点 + 拖动）吸附到 20px 网格。
+    关闭后保持 1px 像素精度。
     _snapRegionSize —— 分区框尺寸（创建框大小 + 手柄调整）吸附到 20px
-    网格步长（默认关，同 _snapSize）。开启后尺寸粒度为 1 个网格单元格。*/
+    网格步长。关闭后保持 1px 粒度。*/
   _snapRegionPos: true,
-  _snapRegionSize: false,
+  _snapRegionSize: true,
   //当内联编辑器内的文本拖选结束于节点
   //外部时置位：浏览器随后会在画布（公共祖先）上触发单击，
   //该单击绝不能取消/覆盖激活中的内联编辑。
@@ -1602,6 +1629,20 @@ const App = window.App = {
   //真实节点拖拽结束后约 300ms 内置位：吞掉浏览器的
   //单击，以免刚拖拽的选中被其清除。
   _dragJustFinished: false,
+  //关联高亮（按住 Alt 单击节点）：高亮集合 = 被点节点 + 直接邻居（一层）。纯视觉态，不改变选中集合。
+  hlNodeIds: null,
+  //高亮涉及的连线 key 集合（两端节点都在 hlNodeIds 内）。
+  hlConnKeys: null,
+  //高亮置顶前捕获的节点全序快照（_nodeZOrder），清除时恢复原相对顺序。
+  _hlBaseOrder: null,
+  //高亮期间连线被抬升前，在各自组（lines/labels）内的位置快照：
+  //element → { group, index }，清除时按原索引归位。
+  _hlLiftPos: null,
+  //平移（拖动视角）松手后浏览器会补发一次画布 click：置位后
+  //下一次 _onCanvasClick 直接吞掉，保证"拖动视角不清除高亮"。
+  _panJustFinished: false,
+  //平移是否发生过实际位移（>5px，见 M13 rAF 平移处理），mouseup 据此置位。
+  _panActuallyMoved: false,
   _zOrderDirty: false,
   //基于锚点的 addNode 布局：第一次 addNode 调用锚定于
   //当前视口中心。此后每次调用在中心
@@ -1633,9 +1674,9 @@ const App = window.App = {
 写入的值均兼容（代表关闭的 '1'/'0' 与旧 ''）。*/
   _settings: {
     snapNodes: { key: 'flow_snap_nodes', def: true },
-    snapSize:  { key: 'flow_snap_size',  def: false },
+    snapSize:  { key: 'flow_snap_size',  def: true },
     snapRegionPos:  { key: 'flow_snap_region_pos',  def: true },
-    snapRegionSize: { key: 'flow_snap_region_size', def: false },
+    snapRegionSize: { key: 'flow_snap_region_size', def: true },
     autoModal: { key: 'flow_auto_modal', def: false },
     genColor:  { key: 'flow_gen_color',  def: 'blue' },
     chromeHidden: { key: 'flow_hide_ui', def: false },
@@ -1659,6 +1700,15 @@ const App = window.App = {
       App._lsSet(this[name].key, val);
     }
   },
+  /* 对齐设置 4 项的接线映射：设置表名（_settings 行）→ App 字段 → 常规页开关 id。
+     M13 启动加载/开关绑定与 _resetSnapSettings 共用本表，映射只维护一份；
+     各项默认值仍以 _settings 表 def 为唯一事实源（当前 4 项出厂全开）。 */
+  _snapToggleDefs: [
+    { store: 'snapNodes', field: '_snapNodes', id: 'setSnapNodes' },
+    { store: 'snapSize', field: '_snapSize', id: 'setSnapSize' },
+    { store: 'snapRegionPos', field: '_snapRegionPos', id: 'setSnapRegionPos' },
+    { store: 'snapRegionSize', field: '_snapRegionSize', id: 'setSnapRegionSize' }
+  ],
 
   /* ── 共享小工具（多处复用，保持单一实现） ── */
   //通用 id 生成器：单调递增的会话内计数器 + 时间戳 +
@@ -1899,18 +1949,6 @@ Object.assign(App, {
     }
     return out;
   },
-  //分区的父链（含直接父、祖父…到根）。
-  _regionAncestorIds(id) {
-    const out = new Set();
-    let cur = this._getRegionById(id);
-    let guard = 0;
-    while (cur && cur.parentId && guard++ < 1000) {
-      if (out.has(cur.parentId)) break;   //防环
-      out.add(cur.parentId);
-      cur = this._getRegionById(cur.parentId);
-    }
-    return out;
-  },
   //分区父链长度（渲染叠放与命中优先级：子分区画在父之上）。
   _regionDepth(r) {
     let d = 0;
@@ -1947,11 +1985,6 @@ Object.assign(App, {
       if (d > bestDepth) { best = hit[i]; bestDepth = d; }
     }
     return best;
-  },
-  //命中点所在分区是否为某分区的后代/自身（用于禁止把分区移进自己的子树）。
-  _regionContainsRegion(outerId, innerId) {
-    if (outerId === innerId) return true;
-    return this._regionDescendantIds(outerId).has(innerId);
   },
   //节点归属同步（显式 nodeIds 维护）：按节点中心点命中的最深层分区归属。
   //命中 → 从所有分区 nodeIds 移除该 id 后加入命中分区（树形单归属）；
@@ -2007,6 +2040,9 @@ Object.assign(App, {
      持久化 localStorage 自动保存，它同时携带视口信息）。这样确保
      撤销/重做步仅代表真实变更。*/
   saveCanvasSnapshot() {
+    //存快照 = 画布数据发生（或即将发生）变更 = 一次画布操作：
+    //取消关联高亮（拖动视角/缩放不存快照，因此不受影响）。
+    this._clearHighlight();
     //任何数据变更都可能导致连线重排/新增/删除——因此平行偏移
     //偏移缓存不得比数据变更存活更久；节点 id 缓存同理。
     this._connOffsCache = null;
@@ -2637,6 +2673,9 @@ Object.assign(App, {
 
     //第 6 步 坐标 HUD 更新
     this.updateCoordDisplay();
+
+    //第 7 步 关联高亮的模糊半径随缩放折算（仅高亮期间需要）
+    if (this.hlNodeIds) this._hlBlur(true);
   },
 
   /** 网格通过 Canvas 2D 在屏幕像素空间中绘制。
@@ -2836,7 +2875,9 @@ Object.assign(App, {
     const nodesContainer = this._getEl('canvasNodes');
     if (nodesContainer) {
       for (const id of this._nodeZOrder) {
-        const zel = this._nodeElMap.get(id); if (zel) nodesContainer.appendChild(zel);
+        const zel = this._nodeElMap.get(id);
+        //在当前所属层内重排（高亮期间被抬起的节点位于 #nodeLayerHl）
+        if (zel) (zel.parentNode || nodesContainer).appendChild(zel);
       }
     }
     this._zOrderDirty = false;
@@ -2861,6 +2902,90 @@ Object.assign(App, {
     for (const id of ids) {
       const el = this._nodeElMap.get(id); if (el) { el.remove(); this._nodeElMap.delete(id); }
     }
+  },
+
+  //节点"是否显示选中视觉"：真选中 或 关联高亮（高亮只是视觉，不改选中集合）。
+  _nodeIsSel(id) {
+    return this.selectedNodeIds.has(id) || !!(this.hlNodeIds && this.hlNodeIds.has(id));
+  },
+  //连线"是否显示选中视觉"：真选中 或 高亮连线。
+  _connIsSel(k) {
+    return this.selectedConnIds.has(k) || !!(this.hlConnKeys && this.hlConnKeys.has(k));
+  },
+  //清除关联高亮并还原置顶前顺序（见 _liftHlLayer）。
+  //"拖动视角/缩放画布"之外的任何画布操作都会触发（renderCanvas / saveCanvasSnapshot
+  //入口 + 连线点击 / 右键菜单 / socket 起点），保证高亮只被视图操作保留。
+  _clearHighlight() {
+    if (!this.hlNodeIds && !this.hlConnKeys) return;
+    this.hlNodeIds = null;
+    this.hlConnKeys = null;
+    //高亮节点移回主层并清除标记；真选中节点的 selected 类保留。
+    const mainLayer = this._getEl('nodeLayerMain');
+    this._nodeElMap.forEach((el, id) => {
+      if (!this.selectedNodeIds.has(id)) el.classList.remove('selected');
+      if (el.classList.contains('hl-on')) {
+        el.classList.remove('hl-on');
+        if (mainLayer) mainLayer.appendChild(el);
+      }
+    });
+    this._hlBlur(false);
+    //还原节点全序：仍在图中的 id 按 _hlBaseOrder 归位；快照后的新节点（理论上
+    //操作已清高亮，此处仅兜底）按当前顺序接在末尾。
+    if (this._hlBaseOrder) {
+      const cur = this._nodeZOrder;
+      const keep = new Set(cur);
+      const next = this._hlBaseOrder.filter(id => keep.has(id));
+      cur.forEach(id => { if (!this._hlBaseOrder.includes(id)) next.push(id); });
+      this._nodeZOrder = next;
+      this._zOrderDirty = true;
+      //层已归位，立即按还原后的顺序重排 DOM（不必等到下次 renderCanvas）。
+      this._applyZOrder();
+    }
+    this._hlBaseOrder = null;
+    //还原连线元素在各自组内的位置（从抬升组移回并重排）。
+    if (this._hlLiftPos) {
+      const svg = this._getEl('linesSvg');
+      if (svg) {
+        const baseLines = svg.querySelector('.conn-group:not(.temp) .lines');
+        const baseLabels = svg.querySelector('.conn-group:not(.temp) .labels');
+        const restoreGroup = (group, els) => {
+          if (!group || !els || !els.length) return;
+          els.forEach(el => { if (el.parentNode && el.parentNode !== group) group.appendChild(el); });
+          //按快照索引稳定排序：未记录的元素保持原相对位置。
+          const idx = new Map();
+          this._hlLiftPos.forEach(rec => { if (rec.group === group) idx.set(rec.el, rec.index); });
+          const kids = Array.prototype.slice.call(group.children);
+          kids.sort((a, b) => {
+            const ia = idx.has(a) ? idx.get(a) : -1, ib = idx.has(b) ? idx.get(b) : -1;
+            if (ia === -1 && ib === -1) return 0;
+            if (ia === -1) return 1;
+            if (ib === -1) return -1;
+            return ia - ib;
+          });
+          kids.forEach(el => group.appendChild(el));
+        };
+        //按记录的原始分组分别归位：同一条线的视觉/命中路径与箭头属于 lines 组，
+        //文字属于 labels 组。两组共用同一数组会把元素全部塞进后一个组。
+        const movedTo = g => this._hlLiftPos.filter(rec => rec.group === g).map(rec => rec.el);
+        restoreGroup(baseLines, movedTo(baseLines));
+        restoreGroup(baseLabels, movedTo(baseLabels));
+        const hlSvg = this._getEl('linesSvgHl');
+        const lift = hlSvg ? hlSvg.querySelector('.conn-group.hl-lift') : null;
+        if (lift) lift.remove();
+      }
+      this._hlLiftPos = null;
+    }
+    //连线类/宽度刷新（走 rAF；若调用方随后 renderCanvas 会合并为一次）。
+    this.renderLines();
+  },
+
+  //关联高亮的背景模糊开关：.hl-blur 驱动非高亮内容的模糊（规则见 CSS）。
+  //--hl-scale 供连线与分区层把世界半径折算为屏幕半径，随缩放刷新。
+  _hlBlur(on) {
+    const stage = this._getEl('canvasStage');
+    if (!stage) return;
+    stage.classList.toggle('hl-blur', on);
+    if (on) stage.style.setProperty('--hl-scale', String(this.scale));
   },
 
   _forceRerender() {
@@ -2920,7 +3045,11 @@ Object.assign(App, {
             '<svg class="regions-svg" id="regionsSvg" style="overflow:visible"></svg>' +
             '<div class="region-labels" id="regionLabels"></div>' +
             '<svg class="lines-svg" id="linesSvg" style="overflow:visible"></svg>' +
-            '<div class="canvas-nodes" id="canvasNodes"></div>' +
+            '<div class="canvas-nodes" id="canvasNodes">' +
+              '<div class="node-layer" id="nodeLayerMain"></div>' +
+              '<div class="node-layer" id="nodeLayerHl"></div>' +
+            '</div>' +
+            '<svg class="lines-svg hl-lift-svg" id="linesSvgHl" style="overflow:visible"></svg>' +
             '<svg class="curve-overlay" id="curveOverlay" width="1" height="1" style="overflow:visible"></svg>' +
           '</div>' +
           '<div class="sel-overlay" id="boxSelectOverlay" style="display:none;"></div>' +
@@ -2980,7 +3109,7 @@ Object.assign(App, {
 
         this._bindNodeEvents(nodeEl, node.id);
         this._nodeElMap.set(node.id, nodeEl);
-        nodesContainer.appendChild(nodeEl);
+        (this._getEl('nodeLayerMain') || nodesContainer).appendChild(nodeEl);
       }
 
       this._updateNodeAppearance(nodeEl, node);
@@ -3029,7 +3158,7 @@ Object.assign(App, {
   _updateNodeAppearance(nodeEl, node) {
     //className 在此重建，因此需重新追加 'resizing' 标志和
     //'mirrored' 类——否则任何渲染都会将它们清掉。
-    nodeEl.className = 'node' + (node.mirrored ? ' mirrored' : '') + (this.selectedNodeIds.has(node.id) ? ' selected' : '') + (this.dragState && this.dragState.nodeId === node.id ? ' dragging' : '') + (nodeEl.classList.contains('resizing') ? ' resizing' : '') + (this._isCollapseHidden(node.id) ? ' collapse-hidden' : '');
+    nodeEl.className = 'node' + (node.mirrored ? ' mirrored' : '') + (this._nodeIsSel(node.id) ? ' selected' : '') + (this.dragState && this.dragState.nodeId === node.id ? ' dragging' : '') + (nodeEl.classList.contains('resizing') ? ' resizing' : '') + (this._isCollapseHidden(node.id) ? ' collapse-hidden' : '');
 
     this._syncResizeHandles(nodeEl, node.id);
     this._applyNodeSize(nodeEl, node);
@@ -3058,20 +3187,32 @@ Object.assign(App, {
     nodeEl._sckOut.style.color = rc.hex;
     nodeEl._sckIn.dataset.node = node.id;
     nodeEl._sckOut.dataset.node = node.id;
-    //收起徽标（仅输出连接点）：
-    //  - 未收起：可收起（无多父冲突、有后续连线）时 − 常态显示，点击收起；
-    //  - 已收起：fold-on 使 + 常态显示（不依赖悬停），点击展开。
-    //fold-avail 门控：无可收起内容 / 存在多父冲突时不出 − 徽标（不提供动作）。
-    const canFold = this._canToggleCollapse(node.id);
-    nodeEl._sckOut.classList.toggle('fold-avail', canFold && !node.collapse);
-    nodeEl._sckOut.classList.toggle('fold-on', !!node.collapse);
-    //徽标图标：fold-plus 显示 +（竖条+横条），默认 −（仅横条）
-    if (nodeEl._fold) nodeEl._fold.classList.toggle('fold-plus', !!node.collapse);
+    this._syncFoldBadge(nodeEl, node);
     //被收起记录隐藏的节点整体不渲染。此处只降级为隐藏、绝不恢复显示：
     //display 的"恢复"由 _updateNodeVisibility（视口剔除）统一负责，
     //避免外观更新把视口剔除的状态覆盖回可见。
     if (this._isCollapseHidden(node.id)) nodeEl.style.display = 'none';
     //socket 的左右镜像由 CSS 通过 .node.mirrored 驱动。
+  },
+
+  //输出连接点的收起徽标同步：
+  //  - 未收起：可收起（无多父冲突、有后续连线）时 fold-avail 使 − 常态显示，点击收起；
+  //  - 已收起：fold-on 使 + 常态显示（不依赖悬停），点击展开。
+  //fold-avail 门控：无可收起内容 / 存在多父冲突时不出 − 徽标（不提供动作）。
+  _syncFoldBadge(nodeEl, node) {
+    const canFold = this._canToggleCollapse(node.id);
+    nodeEl._sckOut.classList.toggle('fold-avail', canFold && !node.collapse);
+    nodeEl._sckOut.classList.toggle('fold-on', !!node.collapse);
+    //徽标图标：fold-plus 显示 +（竖条+横条），默认 −（仅横条）
+    if (nodeEl._fold) nodeEl._fold.classList.toggle('fold-plus', !!node.collapse);
+  },
+  //连线增删后的徽标重算：收起闭包由节点出发的连线推导，任一连线变化
+  //都可能改变多个节点的徽标（含上游祖先、多父冲突解除），故整体重算。
+  _refreshFoldBadges() {
+    this.canvasState.nodes.forEach(n => {
+      const el = this._nodeElMap.get(n.id);
+      if (el && el._sckOut) this._syncFoldBadge(el, n);
+    });
   },
 
   _postRenderUpdate() {
@@ -3119,6 +3260,9 @@ Object.assign(App, {
 
   renderCanvas({ center = false } = {}) {
     if (!this._prepCanvas()) return;
+    //任何画布操作都会走到这里重绘（拖动视角 / 缩放画布除外，它们只走
+    //applyViewTransform/renderLines），因此在此清除关联高亮：操作结束即取消。
+    this._clearHighlight();
     this._ensureCanvasSkeleton();
     this._renderNodes();
     this._renderRegions();
@@ -3454,6 +3598,14 @@ Object.assign(App, {
   },
   //单个 socket 侧的箭头基本方向、标签中点与完整箭头几何
   //（connArrowBaseX / connLabelPos / connArrows）已下沉至 Weave.Geom（M01）。
+  //连线图层级的组级继承样式：命中路径的 pointer-events=stroke 目标依赖组级
+  //strokeWidth 保持可点击（15×scale，最小 8px）；标签继承 fontSize 而非 CSS 的
+  //font-size（后者会破坏缩放）。常驻组（_ensureSvgLayers）与关联高亮抬升组
+  //（_hlSyncLiftStyles）共用，数值只在此处维护。
+  _styleConnLayer(linesEl, labelsEl) {
+    if (linesEl) linesEl.style.strokeWidth = Math.max(15 * this.scale, 8);
+    if (labelsEl) labelsEl.style.fontSize = 10 * this.scale + 'px';
+  },
   //SVG 图层栈（conn-group → 连线条 + 标签）及其常驻 DOM
   //映射和组级继承属性。由完整连线
   //渲染器和增量平移渲染器（可能先执行）共用。
@@ -3468,12 +3620,47 @@ Object.assign(App, {
     //会抛出异常——增量平移渲染器可能在任一次完整
     //_doRenderLines 填充它们之前就运行。
     if (!this._visPathByKey) { this._visPathByKey = new Map(); this._hitPathByKey = new Map(); this._labelByKey = new Map(); this._arrowPathByKey = new Map(); }
-    //命中路径的 pointer-events=stroke 目标依赖这个继承的
-    //strokeWidth 保持可点击（15×scale，最小 8px）；标签继承
-    //fontSize 而非 CSS 的 font-size（后者会破坏缩放）。
-    linesGroup.style.strokeWidth = Math.max(15 * this.scale, 8);
-    labelsGroup.style.fontSize = 10 * this.scale + 'px';
+    this._styleConnLayer(linesGroup, labelsGroup);
+    this._hlSyncLiftStyles();
     return { connGroup, linesGroup, labelsGroup };
+  },
+
+  // 关联高亮（按住 Alt 单击节点）：把高亮连线的全部元素（视觉路径 / 命中路径 /
+  // 箭头 / 标签）从常驻 conn-group 抬升到顶层连线 SVG（#linesSvgHl）的专用组，
+  // 使它们盖过其他连线、连线文字与全部节点，达到"置顶"。整体几何/交互不受影响：
+  // 元素保持原有 dataset 与监听器，命中路径与标签各自的 pointer-events 规则照常生效。
+  _hlLiftLayer() {
+    const svg = this._getEl('linesSvgHl');
+    if (!svg) return null;
+    let lift = svg.querySelector('.conn-group.hl-lift');
+    if (!lift) {
+      lift = Weave.Util.svgEl('g', { class: 'conn-group hl-lift' });
+      const lines = Weave.Util.svgEl('g', { class: 'lines' });
+      const labels = Weave.Util.svgEl('g', { class: 'labels' });
+      lift.appendChild(lines);
+      lift.appendChild(labels);
+      svg.appendChild(lift);
+    }
+    return lift;
+  },
+  // 同步抬升组的继承样式（命中路径宽度 / 标签字号），缩放（renderLines →
+  // _ensureSvgLayers）时保持与常驻组一致。
+  _hlSyncLiftStyles() {
+    const svg = this._getEl('linesSvgHl');
+    const lift = svg ? svg.querySelector('.conn-group.hl-lift') : null;
+    if (!lift) return;
+    this._styleConnLayer(lift.querySelector('.lines'), lift.querySelector('.labels'));
+  },
+  // 高亮连线 key → 该连线在抬升组内的目标子组（lines 放路径/命中/箭头，
+  // labels 放文字）。供 _renderConnection 的创建闭包路由。
+  _hlTargetsFor(k, linesGroup, labelsGroup) {
+    const isHl = !!(this.hlConnKeys && this.hlConnKeys.has(k));
+    const lift = isHl ? this._hlLiftLayer() : null;
+    return {
+      isHl,
+      lines: lift ? lift.querySelector('.lines') : linesGroup,
+      labels: lift ? lift.querySelector('.labels') : labelsGroup
+    };
   },
 
   //连接点锚定、自动控制点与完整箭头几何（getSocketAnchor /
@@ -3494,6 +3681,8 @@ Object.assign(App, {
     el.addEventListener('mousedown', e => { if (e.button !== 1) e.stopPropagation(); });
     el.addEventListener('click', e => {
       e.stopPropagation();
+      //点击选中连线属于画布操作：取消关联高亮（只走 renderLines，故在此显式清除）。
+      this._clearHighlight();
       if (e.ctrlKey || e.metaKey) {
         // Ctrl+单击可在多选选中/取消选中该连线。
         if (this.selectedConnIds.has(k)) this.selectedConnIds.delete(k);
@@ -3522,7 +3711,7 @@ Object.assign(App, {
       //选中态优先于悬停态（与旧 CSS 规则顺序相同）。
       const vis = svgRoot.querySelector('.line[data-conn-key="' + k + '"]');
       if (vis) {
-        const sel = this.selectedConnIds.has(k);
+        const sel = this._connIsSel(k);
         vis.setAttribute('stroke-width', String((sel ? 4 : (on ? 3.5 : 2.5)) * this.scale));
       }
     };
@@ -3584,7 +3773,7 @@ Object.assign(App, {
       const bbT = Math.min(g.fromOut.y, g.fromOut.y + g.cp.c1y, g.toIn.y + g.cp.c2y, g.toIn.y);
       const bbB = Math.max(g.fromOut.y, g.fromOut.y + g.cp.c1y, g.toIn.y + g.cp.c2y, g.toIn.y);
       if (bbR < vpL - margin || bbL > vpR + margin || bbB < vpT - margin || bbT > vpB + margin) return;
-      this._renderConnection(conn, k, fromNode, toNode, this.selectedConnIds.has(k), s, linesGroup, labelsGroup);
+      this._renderConnection(conn, k, fromNode, toNode, this._connIsSel(k), s, linesGroup, labelsGroup);
       seen.add(k);
     });
 
@@ -3687,6 +3876,9 @@ Object.assign(App, {
   // _doRenderLines 与增量平移更新共同使用。更新持久化映射
   // （_visPathByKey / _hitPathByKey / _labelByKey）。
   _renderConnection(conn, k, fromNode, toNode, isSelected, s, linesGroup, labelsGroup) {
+    //关联高亮时（hlConnKeys 含 k）创建的元素直接进入抬升组，使新渲染的
+    //路径/标签/箭头从一开始就盖过其他连线；非高亮时目标组即常驻组。
+    const hlT = this._hlTargetsFor(k, linesGroup, labelsGroup);
     const geo = this._buildLinePath(conn, fromNode, toNode, s);
     const pathCls = geo.pathCls + (isSelected ? ' selected' : '');
 
@@ -3697,7 +3889,7 @@ Object.assign(App, {
     const path = this._reconcileEl(this._visPathByKey, k, () => {
       const el = Weave.Util.svgEl('path', { 'data-conn-key': k, d: geo.d, class: pathCls });
       if (geo.pathStyle) el.setAttribute('style', geo.pathStyle);
-      linesGroup.appendChild(el);
+      hlT.lines.appendChild(el);
       return el;
     });
     path.setAttribute('d', geo.d);
@@ -3714,7 +3906,7 @@ Object.assign(App, {
         stroke: 'transparent', 'pointer-events': 'stroke', opacity: '0'
       });
       el.style.cursor = 'pointer';
-      linesGroup.insertBefore(el, path);
+      hlT.lines.insertBefore(el, path);
       this._bindConnEl(el, k);
       return el;
     });
@@ -3728,7 +3920,7 @@ Object.assign(App, {
           'data-ck': k, 'text-anchor': 'middle', 'font-style': 'italic',
           'dominant-baseline': 'middle', class: 'line-label', fill: '#4a5568'
         });
-        labelsGroup.appendChild(el);
+        hlT.labels.appendChild(el);
         this._bindConnEl(el, k);
         return el;
       });
@@ -3751,8 +3943,8 @@ Object.assign(App, {
     const arr = this._reconcileEl(this._arrowPathByKey, k, () => {
       const a = [Weave.Util.svgEl('path', { 'data-conn-key': k, class: 'conn-arrow' }),
                  Weave.Util.svgEl('path', { 'data-conn-key': k, class: 'conn-arrow' })];
-      linesGroup.appendChild(a[0]);
-      linesGroup.appendChild(a[1]);
+      hlT.lines.appendChild(a[0]);
+      hlT.lines.appendChild(a[1]);
       return a;
     });
     arr[0].setAttribute('d', ar.dOut);
@@ -3772,6 +3964,47 @@ Object.assign(App, {
     this._removeReconciled(this._labelByKey, k);
     const arr = this._arrowPathByKey.get(k);
     if (arr) { arr.forEach(el => el.remove()); this._arrowPathByKey.delete(k); }
+  },
+
+  // ── 关联高亮 · 连线抬升 ──
+  // 把高亮连线（两端节点都在高亮集合）的所有元素抬到顶层连线 SVG 的抬升组。
+  // 已缓存到 _hlLiftPos：element → { group: 'lines'|'labels', index }，
+  // 供清除时按原索引归位（保持原相对顺序）。
+  _hlRecordPositions(el, group) {
+    if (!this._hlLiftPos) this._hlLiftPos = [];
+    this._hlLiftPos.push({ el, group, index: Array.prototype.indexOf.call(group.children, el) });
+  },
+  _hlLiftConnection(k, svg) {
+    const lift = this._hlLiftLayer();
+    if (!lift) return;
+    const liftLines = lift.querySelector('.lines');
+    const liftLabels = lift.querySelector('.labels');
+    const baseLines = svg.querySelector('.conn-group:not(.temp) .lines');
+    const baseLabels = svg.querySelector('.conn-group:not(.temp) .labels');
+    //连线元素按 视觉路径 → 命中路径 → 箭头 → 标签 原组顺序收集，避免悬停镜像错乱。
+    const vis = this._visPathByKey.get(k);
+    const hit = this._hitPathByKey.get(k);
+    const arrows = this._arrowPathByKey.get(k) || [];
+    const label = this._labelByKey.get(k);
+    //先记录全部索引，再移动（避免移动改变后续 indexOf）。
+    const recs = [];
+    const rec = (el, g) => { if (el && el.parentNode === g) recs.push({ el, g }); };
+    rec(vis, baseLines); rec(hit, baseLines); arrows.forEach(a => rec(a, baseLines)); rec(label, baseLabels);
+    recs.forEach(r0 => this._hlRecordPositions(r0.el, r0.g));
+    recs.forEach(r0 => {
+      const target = r0.g === baseLines ? liftLines : liftLabels;
+      target.appendChild(r0.el);
+    });
+  },
+  //把当前高亮集合里的所有在 DOM 中的连线抬升（调用前 hlConnKeys 已就绪）。
+  _hlLiftConns() {
+    if (!this.hlConnKeys || !this.hlConnKeys.size) return;
+    const svg = this._getEl('linesSvg');
+    if (!svg) return;
+    this._hlLiftPos = [];
+    for (const k of this.hlConnKeys) {
+      if (this._visPathByKey && this._visPathByKey.has(k)) this._hlLiftConnection(k, svg);
+    }
   },
 
   // ── 增量平移渲染的空间网格索引 ── 
@@ -3906,7 +4139,7 @@ Object.assign(App, {
           // 传入实时选中状态，使被剔除后重新进入
           // 视口的连线保持高亮（App.selectedConnIds 是
           // 事实来源）。
-          this._renderConnection(conn, k, fromNode, toNode, this.selectedConnIds.has(k), s, linesGroup, labelsGroup);
+          this._renderConnection(conn, k, fromNode, toNode, this._connIsSel(k), s, linesGroup, labelsGroup);
         }
       }
     }
@@ -4107,6 +4340,8 @@ Object.assign(App, {
     const container = this._getEl('canvasStage');
     //分区创建：Region 模式 / Alt+左键。命中到已有分区时不进入创建（转移动）。
     if (e.button === 0 && (this._regionModeActive || e.altKey)) {
+      //画分区（含 Alt+空白按下）是画布操作：取消关联高亮。
+      this._clearHighlight();
       e.preventDefault();
       const wp = this.getWorldPos(e.clientX, e.clientY);
       const hitRegion = this._regionAtPoint(wp.x, wp.y);
@@ -4115,11 +4350,14 @@ Object.assign(App, {
       if (this.regionDragState) { this.finalizeRegionCreate(); return; }
       const rect = container.getBoundingClientRect();
       this.regionDragState = { startWorldX: wp.x, startWorldY: wp.y, curWorldX: wp.x, curWorldY: wp.y, rect };
+      this._applyRegionPreviewColor();
       this._getEl('regionPreview').style.display = 'block';
       this._updateRegionPreview(wp.x, wp.y);
       return;
     }
     if (e.button === 0 && e.shiftKey) {
+      //框选是画布操作：取消关联高亮。
+      this._clearHighlight();
       e.preventDefault();
       if (this.canvasBoxState) { this.finalizeBoxSelect(); return; }
       const wp = this.getWorldPos(e.clientX, e.clientY);
@@ -4136,6 +4374,17 @@ Object.assign(App, {
       this.canvasPanState = { startX: e.clientX, startY: e.clientY, origPanX: this.panX, origPanY: this.panY };
       container.classList.add('grabbing');
     }
+  },
+
+  //分区创建预览的颜色取顶栏生成色，与创建完成后的 region.color 同源：
+  //边框为生成色，填充为生成色加透明度 7%（与 .region-preview 的初始值同参数）。
+  _applyRegionPreviewColor() {
+    const ov = this._getEl('regionPreview');
+    if (!ov) return;
+    const hex = this._resolveColor(this._selectedGenColor || 'blue').hex;
+    const { r, g, b } = Weave.Color.hexToRgb(hex);
+    ov.style.borderColor = hex;
+    ov.style.background = 'rgba(' + r + ',' + g + ',' + b + ',.07)';
   },
 
   //region 创建拖拽的实时预览（屏幕坐标）。
@@ -4228,6 +4477,8 @@ Object.assign(App, {
   //onlyFrame = true 时仅移动分区框本身（右键"移动分区框"）。
   startRegionMove(e, region, onlyFrame) {
     if (this.readOnly) return;
+    //移动分区（整体/仅框体）是画布操作：取消关联高亮。
+    this._clearHighlight();
     e.preventDefault(); e.stopPropagation();
     this._hideResizeHandles();
     this._selectRegionOnly(region.id);
@@ -4653,12 +4904,23 @@ Object.assign(App, {
         //这会打扰悬停/过渡状态，并使节点删除
         //的"X"瞬间消失，而不是像普通的鼠标离开那样淡出。
         if (e.button !== 0) return;
-        //Shift+左键属于框选范围：让事件冒泡到
-        //画布处理器，而不是启动节点拖拽。
-        if (e.shiftKey) return;
         const nodeEl = e.target.closest('.node');
         if (!nodeEl) return;
         const nodeId = nodeEl.dataset.nodeId;
+        //按住绑定的修饰键（默认 Alt，可在设置中自定义，动作 hlNode）
+        //单击节点 = 关联高亮：不改变选中、不进入拖拽，只把该节点与
+        //直接关联的节点/连线/文字高亮并置顶。置于 Shift 放行之前，
+        //保证即使绑定的是 Shift/Ctrl 也能命中（空白处 Shift 框选不受影响）。
+        if (App._hlModifierMatch(e)) {
+          e.preventDefault(); e.stopPropagation();
+          App._highlightAtNode(nodeId, e);
+          return;
+        }
+        //Shift+左键（未命中高亮绑定）属于框选范围：让事件冒泡到
+        //画布处理器，而不是启动节点拖拽。
+        if (e.shiftKey) return;
+        //未命中高亮绑定的节点按下 = 选中/拖拽等画布操作：取消关联高亮。
+        App._clearHighlight();
         if (e.ctrlKey || e.metaKey) { e.stopPropagation(); }
         const isTextArea = (e.target.closest('.node-header') ||
           (e.target.closest('.node-body') && !e.target.closest('.node-clear')) ||
@@ -4720,6 +4982,58 @@ Object.assign(App, {
         document.addEventListener('dragend', function() { container.classList.remove('drag-over'); });
       }
     }
+  },
+
+  // ── 关联高亮（按住 Alt 单击节点）──
+  //仅一层：高亮集合 = 被点节点 + 直接邻居（两端连线关系），以及
+  //两端都在集合内的连线（含其文字标签）。视觉复用默认选中效果
+  //（.node.selected / .line.selected 等），但不写入任何选中集合——
+  //"判定不是选中"。节点与连线/文字分别在自己的层内置顶，保持抬升前
+  //相对顺序。视图操作（拖动视角、缩放）保留高亮；其他画布操作经
+  //renderCanvas/saveCanvasSnapshot/连线点击等入口清除。
+  _highlightAtNode(nodeId) {
+    const node = this._getNodeById(nodeId);
+    if (!node) return;
+    //替换高亮：先还原上一次的视觉状态（类名 / 叠放 / 清晰层 / 连线抬升），
+    //否则旧集合的节点会保留 selected 与清晰层归属。
+    this._clearHighlight();
+    //初次置顶时记录全序快照（此后替换集合仍以最初顺序为还原基准）。
+    if (!this._hlBaseOrder) this._hlBaseOrder = this._nodeZOrder.slice();
+    const nodes = new Set([nodeId]);
+    const nodeSet = new Set(this.canvasState.nodes.map(n => n.id));
+    //一层邻居：与 nodeId 有连线关系的全部节点（含隐藏的收起节点——
+    //它们不渲染但保留关系，视觉上不受影响）。
+    this.canvasState.connections.forEach(c => {
+      if (c.from === nodeId && nodeSet.has(c.to)) nodes.add(c.to);
+      else if (c.to === nodeId && nodeSet.has(c.from)) nodes.add(c.from);
+    });
+    //连线集合 = 两端都 ∈ nodes（即被点节点的直接连线，以及同层内连线）。
+    const connKeys = new Set();
+    this.canvasState.connections.forEach(c => {
+      if (nodes.has(c.from) && nodes.has(c.to)) connKeys.add(c.id);
+    });
+    this.hlNodeIds = nodes;
+    this.hlConnKeys = connKeys;
+    //节点层内置顶：复用既有"节点置顶"操作 _bringToFront（按传入顺序稳定
+    //移至 _nodeZOrder 末尾并 _applyZOrder），不调 renderCanvas（会先清高亮）。
+    this._bringToFront(this._nodeZOrder.filter(id => nodes.has(id)));
+    //节点类名：直接加 selected（与选中视觉一致），不动 selectedNodeIds。
+    this._nodeElMap.forEach((el, id) => {
+      if (nodes.has(id)) el.classList.add('selected', 'hl-on');
+    });
+    //移入清晰层，按 _nodeZOrder 顺序追加以保持抬升前的相对叠放。
+    const hlLayer = this._getEl('nodeLayerHl');
+    if (hlLayer) {
+      this._nodeZOrder.forEach(id => {
+        if (!nodes.has(id)) return;
+        const el = this._nodeElMap.get(id);
+        if (el) hlLayer.appendChild(el);
+      });
+    }
+    this._hlBlur(true);
+    //连线抬升 + 选中视觉刷新（renderLines 走 rAF，不触发 renderCanvas）。
+    this._hlLiftConns();
+    this.renderLines();
   },
 
   // ── 节点拖拽 ── 
@@ -4890,14 +5204,15 @@ Object.assign(App, {
   //之内、靠近某个兼容的 socket？纯几何判断，不做 DOM 命中测试。
 
   startSocketDrag(e, nodeId, dir, colorClass) {
+    //从连接点按下（建线 / 收起点点击）是画布操作：取消关联高亮。
+    this._clearHighlight();
     e.preventDefault();
     const nodeEl = this._nodeElMap.get(nodeId);
     if (!nodeEl) return;
     const fromSocket = nodeEl.querySelector('.socket.' + dir);
     //注意：此处不立即加 dragging 类——拖拽判定在 onMove（位移超容差）
     //时进行。点击（未拖拽）场景若 mousedown 即加 dragging，socket 会
-    //瞬间放大 1.6× 且 fold 徽标被 .dragging 规则隐藏，视觉上"变默认
-    //样式"；待 mouseup 才恢复。改为真拖拽时才进入 dragging 态。
+    //瞬间放大 1.6×；待 mouseup 才恢复。改为真拖拽时才进入 dragging 态。
 
     const node = this._getNodeById(nodeId);
     if (!node) return;
@@ -4916,7 +5231,7 @@ Object.assign(App, {
     function onMove(e2) {
       if (!self.socketDragState) return;
       const sd = self.socketDragState;
-      //真拖拽判定：位移超过点击容差 → 进入 dragging 态（放大 + 隐藏徽标）。
+      //真拖拽判定：位移超过点击容差 → 进入 dragging 态（socket 放大，徽标保持显示）。
       //在此之前（点击候选）保持正常外观，避免 mousedown 瞬间的样式闪烁。
       if (fromSocket && !fromSocket.classList.contains('dragging') &&
           (Math.abs(e2.clientX - sd.startClientX) > SOCKET_CLICK_TOLERANCE ||
@@ -4978,6 +5293,8 @@ Object.assign(App, {
             const srcNode = self._getNodeById(fromId);
             self.canvasState.connections.push(self._createConnection(fromId, toId, { mirrored: !!(srcNode && srcNode.mirrored) }));
             self.saveCanvasSnapshot();
+            //连线拓扑变化 → 输出连接点徽标重算（本路径不重建节点 DOM）。
+            self._refreshFoldBadges();
           }
         }
         endDrag();
@@ -5031,6 +5348,8 @@ Object.assign(App, {
     }
     if (this._boxSelectJustCompleted) { this._boxSelectJustCompleted = false; return; }
     if (this._regionJustCreated) { this._regionJustCreated = false; return; }
+    //平移（拖动视角）松手补发的 click 不得清除高亮/选中。
+    if (this._panJustFinished) { this._panJustFinished = false; return; }
     const target = e.target;
     if (target.closest('.node') || target.closest('.coord') || target.closest('.sel-overlay') || target.closest('.curve-handles')) return;
     if (this._curveEditState) { this._exitCurveEdit(); }
@@ -5070,14 +5389,21 @@ Object.assign(App, {
       autoModal: { anyMod: true,  shift: false, alt: false, key: 'e' },
       chrome:    { anyMod: true,  shift: false, alt: false, key: 'h' },
       region:    { anyMod: false, shift: true,  alt: false, key: 'r' },
-      delete:    { anyMod: false, shift: false, alt: false, key: 'delete' }
+      delete:    { anyMod: false, shift: false, alt: false, key: 'delete' },
+      //关联高亮："按住某修饰键 + 点击节点"。key:'any' 表示只需修饰键匹配，
+      //不限定同时按下的主键（纯修饰键手势，参与鼠标点击判定而非键盘命令）。
+      hlNode:    { anyMod: false, ctrl: false, meta: false, alt: true, shift: false, key: 'any' }
     };
     const saved = this._settings.get('keybinds');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         for (const k of Object.keys(parsed)) {
-          if (defs[k] && parsed[k] && parsed[k].key) defs[k] = parsed[k];
+          const pk = parsed[k];
+          if (!defs[k] || !pk || !pk.key) continue;
+          //哨兵 'any'（纯修饰键、无主键）只对鼠标手势动作（当前仅 hlNode）有效：
+          //其余动作即使存档里出现也拒绝合并，避免"看似绑定实则永不触发"。
+          if (k === 'hlNode' || pk.key !== 'any') defs[k] = pk;
         }
       } catch (err) { /* 忽略损坏的存档 */ }
     }
@@ -5105,9 +5431,19 @@ Object.assign(App, {
     if (b.meta) parts.push('Cmd');
     if (b.alt) parts.push('Alt');
     if (b.shift) parts.push('Shift');
+    //纯修饰键手势（key 哨兵 'any'，无主键）：只显示修饰键，如 "Alt"。
     const k = b.key;
-    parts.push(k.length === 1 ? k.toUpperCase() : k);
+    if (k !== 'any') parts.push(k.length === 1 ? k.toUpperCase() : k);
     return parts.join('+');
+  },
+  //关联高亮触发键匹配：当前按下的修饰键集合 == hlNode 绑定（key 忽略）。
+  //注意与 _keyMatch 不同——它看修饰键按下状态而非某主键命令。
+  _hlModifierMatch(e) {
+    const b = this._keybinds && this._keybinds.hlNode;
+    if (!b) return false;
+    if (b.anyMod) return !!(e.ctrlKey || e.metaKey);   //语义兼容（默认未用）
+    return !!e.ctrlKey === !!b.ctrl && !!e.metaKey === !!b.meta &&
+           !!e.altKey === !!b.alt && !!e.shiftKey === !!b.shift;
   }
 });
 
@@ -5612,6 +5948,8 @@ Object.assign(App, {
   },
   //手柄拖拽：改框的 x/y/w/h（仅框体，节点不参与）。nw/sw 拖改变 x，nw/ne 改变 y。
   _startRegionResizeDrag(e, r, dir) {
+    //调整分区大小是画布操作：取消关联高亮。
+    this._clearHighlight();
     this.saveCanvasSnapshot();   //拖拽会话作为一步撤销
     const self = this;
     const wp0 = this.getWorldPos(e.clientX, e.clientY);
@@ -6128,6 +6466,8 @@ Object.assign(App, {
       this._removeCurveHandles();
     }
     this.saveCanvasSnapshot();
+    //连线拓扑变化 → 输出连接点徽标重算（本路径不重建节点 DOM）。
+    this._refreshFoldBadges();
     this.renderLines();
     if (removed === 1) this.showToast(this.t('toast.connDeleted'), 'warning');
     else this.showToast(this.t('toast.connsDeleted', { n: removed }), 'warning');
@@ -6187,6 +6527,10 @@ Object.assign(App, {
     });
   },
   //进入键位录制：全局捕获按键，Enter 保存 / Esc 取消，冲突则拒绝。
+  //纯修饰键手势（如单独 Alt，供 hlNode"按住修饰键+点击节点"使用）采用 keyup
+  //确认：修饰键按下先记为候选，若随后按下主键则升级为带主键的组合；若直接松开
+  //则保存为纯修饰键。这避免把"组合键中间态"（按 Ctrl 后还没按 K）误存为纯 Ctrl。
+  //无主键统一记 key:'any' 哨兵；纯修饰键只允许绑定到鼠标手势动作（当前仅 hlNode）。
   _startKeybindEdit(action, input) {
     if (this._keybindEditing) this._cancelKeybindEdit();
     input.dataset.orig = input.value;
@@ -6194,17 +6538,8 @@ Object.assign(App, {
     input.value = '';
     input.placeholder = '…';
     const self = this;
-    const onKey = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const key = e.key.toLowerCase();
-      if (key === 'enter') { if (self._keybindEditing) self._cancelKeybindEdit(); return; }
-      if (key === 'escape') { self._cancelKeybindEdit(); return; }
-      if (key === 'control' || key === 'meta' || key === 'shift' || key === 'alt') return;
-      const combo = {
-        ctrl: !!e.ctrlKey, meta: !!e.metaKey, alt: !!e.altKey, shift: !!e.shiftKey, key
-      };
-      if (!(combo.ctrl || combo.meta || combo.alt || combo.shift)) return; // 裸键不绑定，防误改
+    let pendingMod = null;
+    const finish = (combo) => {
       //冲突检查：与其它动作相同则拒绝
       for (const a of Object.keys(self._keybinds)) {
         if (a === action) continue;
@@ -6222,10 +6557,50 @@ Object.assign(App, {
       input.classList.remove('recording');
       self._keybindEditing = null;
       document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('keyup', onUp, true);
       self.showToast(self.t('toast.keybindSaved'));
     };
-    this._keybindEditing = { action, input, onKey };
+    const onKey = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = e.key.toLowerCase();
+      if (key === 'enter') { if (self._keybindEditing) self._cancelKeybindEdit(); return; }
+      if (key === 'escape') { self._cancelKeybindEdit(); return; }
+      const isModOnly = key === 'control' || key === 'meta' || key === 'shift' || key === 'alt';
+      if (isModOnly) {
+        const combo = {
+          ctrl: !!e.ctrlKey, meta: !!e.metaKey, alt: !!e.altKey, shift: !!e.shiftKey, key: ''
+        };
+        //仅接受单一修饰键为候选；多修饰键无主键没有意义。
+        const only = (combo.ctrl ? 1 : 0) + (combo.meta ? 1 : 0) + (combo.alt ? 1 : 0) + (combo.shift ? 1 : 0);
+        if (only === 1 && !pendingMod) pendingMod = combo;
+        return;
+      }
+      //带主键：event 修饰键状态已含此前按下的修饰键，直接完成录制。
+      finish({ ctrl: !!e.ctrlKey, meta: !!e.metaKey, alt: !!e.altKey, shift: !!e.shiftKey, key });
+    };
+    const onUp = (e) => {
+      if (!pendingMod) return;
+      const k = e.key.toLowerCase();
+      const matched = (pendingMod.ctrl && k === 'control') || (pendingMod.meta && k === 'meta') ||
+                      (pendingMod.alt && k === 'alt') || (pendingMod.shift && k === 'shift');
+      if (matched) {
+        const c = pendingMod; pendingMod = null;
+        //键盘命令若绑成纯修饰键将永远无法触发：只允许鼠标手势动作（当前仅 hlNode）
+        //录制纯修饰键，其余动作直接拒绝，避免"看似已保存实则无效"的假绑定。
+        if (action !== 'hlNode') {
+          self.showToast(self.t('toast.modOnlyHlNode'), 'warning');
+          self._cancelKeybindEdit();
+          return;
+        }
+        //与默认表同构：无主键统一记 key:'any'（载入合并/显示/冲突检查只认这一个哨兵）。
+        c.key = 'any';
+        finish(c);
+      }
+    };
+    this._keybindEditing = { action, input, onKey, onUp };
     document.addEventListener('keydown', onKey, true);
+    document.addEventListener('keyup', onUp, true);
   },
   _cancelKeybindEdit() {
     const s = this._keybindEditing;
@@ -6234,6 +6609,7 @@ Object.assign(App, {
     s.input.classList.remove('recording');
     this._keybindEditing = null;
     document.removeEventListener('keydown', s.onKey, true);
+    if (s.onUp) document.removeEventListener('keyup', s.onUp, true);
   },
   //填充设置弹窗中的键位框并绑定录制交互（Init 调用一次）。
   _bindKeybindInputs() {
@@ -6258,6 +6634,18 @@ Object.assign(App, {
     });
     this.showToast(this.t('toast.keysReset'));
   },
+  //重置常规页 4 个对齐设置：逐项恢复到 _settings 表的出厂默认（def，当前全开）。
+  //映射复用 App._snapToggleDefs（与 M13 启动加载同一份），默认值不重复写字面量。
+  _resetSnapSettings() {
+    for (const d of this._snapToggleDefs) {
+      const def = this._settings[d.store].def;
+      this._settings.setBool(d.store, def);
+      this[d.field] = def;
+      const el = document.getElementById(d.id);
+      if (el) el.checked = def;
+    }
+    this.showToast(this.t('toast.snapReset'));
+  },
   closeSettings() {
     document.getElementById('settingsModal').classList.remove('on');
     //首次启动的键位设置（设置弹窗）看过一次后不再自动弹出。
@@ -6280,6 +6668,8 @@ Object.assign(App, {
   //分区右键：regionId 非空 → 显示 属性 / 移动分区框 / 调整分区框大小 / 删除；
   //节点/连线路径不变。"属性"与"删除"复用节点同款按钮（与节点菜单一致）。
   showCtx(x, y, nodeId, connId, editTarget, regionId) {
+    //打开右键菜单是画布操作：取消关联高亮。
+    this._clearHighlight();
     this._ctxNodeId = nodeId;
     this._ctxConnId = connId || null;
     this._ctxRegionId = regionId || null;
@@ -6539,6 +6929,9 @@ Object.assign(App, {
   //（离线 / 被屏蔽）→ 使用系统字体回退。
   async _inlineExportFonts() {
     try {
+      //file:// 页面的源为 null，跨源取 Google Fonts CSS 必被 CORS 拦截：
+      //直接跳过，避免控制台报错与一次无效请求（导出文字走系统字体回退）。
+      if (location.protocol === 'file:') return '';
       const link = document.head.querySelector('link[href*="fonts.googleapis.com"]');
       if (!link) return '';
       const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
@@ -6576,10 +6969,7 @@ Object.assign(App, {
     parts.push(
       '.node-close,.node-clear{display:none!important}',
       '.node.selected{outline:none!important}',
-      '.line.selected,.line-label.selected,.conn-arrow.selected{filter:none!important}',
-      //收起展开徽标绝不出现在 PNG 中（快照内的徽标元素已被移除，
-      //此项双保险：悬停态下的 :hover 在 <img> 栅格化时不生效）。
-      '.socket.out.fold-avail .socket-fold,.socket.out.fold-on .socket-fold{display:none!important}'
+      '.line.selected,.line-label.selected,.conn-arrow.selected{filter:none!important}'
     );
     return parts.join('\n');
   },
@@ -6604,13 +6994,10 @@ Object.assign(App, {
     //按 1:1 世界比例重建时移除，改由下方重建的 regions SVG 自带文本标签。
     const liveLabels = sn.querySelector('#regionLabels');
     if (liveLabels) liveLabels.remove();
-    //收起隐藏节点 / 收起展开徽标（+ −）不进入导出：
-    //被收起的节点从快照中整体移除（保持画布上"被收起"的呈现），
-    //视口剔除（display:none）的节点才恢复显示。
-    //注意：socket-fold 默认隐藏（输出连接点显示 socket-inner 圆点），
-    //只有 fold-avail（−）/ fold-on（+）徽标才需移除。
+    //收起隐藏节点不进入导出：被收起的节点从快照中整体移除（保持画布上
+    //"被收起"的呈现），视口剔除（display:none）的节点才恢复显示。
+    //输出连接点的 −/+ 徽标随节点保留，与画布显示一致。
     sn.querySelectorAll('.node.collapse-hidden').forEach(el => el.remove());
-    sn.querySelectorAll('.socket.out.fold-avail .socket-fold, .socket.out.fold-on .socket-fold').forEach(el => el.remove());
     sn.querySelectorAll('.node').forEach(el => { if (el.style.display === 'none') el.style.display = ''; });
     sn.querySelectorAll('.node.selected,.node.dragging,.node.resizing,.line.selected,.line.hover,.line-label.selected,.line-label.hover,.conn-arrow.selected').forEach(el => el.classList.remove('selected', 'dragging', 'resizing', 'hover'));
     sn.querySelectorAll('.node-close,.node-clear').forEach(el => el.remove());
@@ -6620,6 +7007,9 @@ Object.assign(App, {
     //该缩放级别下才有效。与实时渲染使用相同的数据与几何辅助函数。
     const oldSvg = sn.querySelector('#linesSvg');
     if (oldSvg) oldSvg.remove();
+    //高亮抬升层同样不进导出：快照按数据重建全部连线，保留它会重复绘制。
+    const oldHlSvg = sn.querySelector('#linesSvgHl');
+    if (oldHlSvg) oldHlSvg.remove();
     const svg = Weave.Util.svgEl('svg', { class: 'lines-svg', width: '1', height: '1' });
     svg.style.overflow = 'visible';
     const connGroup = Weave.Util.svgEl('g', { class: 'conn-group' });
@@ -7013,7 +7403,9 @@ Object.assign(App, {
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.shadowOffsetX = 0;
       const socketR = 8, socketInnerR = 4;
       const outP = Weave.Geom.getSocketAnchor(n, 'out'), inP = Weave.Geom.getSocketAnchor(n, 'in');
-      [outP.x, inP.x].forEach((sx) => {
+      //输出连接点带收起徽标（−/+）时以徽标替代中心圆点，与画布显示一致。
+      const foldBadge = this._canToggleCollapse(n.id);
+      [outP.x, inP.x].forEach((sx, i) => {
         ctx.beginPath();
         ctx.arc(sx, outP.y, socketR, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
@@ -7021,6 +7413,18 @@ Object.assign(App, {
         ctx.strokeStyle = rc.hex;
         ctx.lineWidth = 2;
         ctx.stroke();
+        if (i === 0 && foldBadge) {
+          //横线为 −，叠加竖线为 +（线宽与 SVG 徽标的 2/8 比例接近）。
+          ctx.beginPath();
+          ctx.moveTo(sx - 3, outP.y); ctx.lineTo(sx + 3, outP.y);
+          if (n.collapse) { ctx.moveTo(sx, outP.y - 3); ctx.lineTo(sx, outP.y + 3); }
+          ctx.strokeStyle = rc.hex;
+          ctx.lineWidth = 1.6;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          ctx.lineCap = 'butt';
+          return;
+        }
         ctx.beginPath();
         ctx.arc(sx, outP.y, socketInnerR, 0, Math.PI * 2);
         ctx.fillStyle = rc.hex;
@@ -7115,7 +7519,10 @@ document.addEventListener('mousemove', function(e) {
         App.panY = App.canvasPanState.origPanY + (ev.clientY - App.canvasPanState.startY);
         //从分区上按下放行来的平移：位移超过阈值则置位，rect 的 click 据此不选中。
         if (Math.abs(ev.clientX - App.canvasPanState.startX) > 5 ||
-            Math.abs(ev.clientY - App.canvasPanState.startY) > 5) App._regionPanMoved = true;
+            Math.abs(ev.clientY - App.canvasPanState.startY) > 5) {
+          App._regionPanMoved = true;
+          App._panActuallyMoved = true;
+        }
         App.clampPan();
         /*只更新 world 平移 + 网格（缩放不变）*/
         const world = App._getEl('canvasWorld');
@@ -7134,6 +7541,13 @@ document.addEventListener('mouseup', function() {
     const c = App._getEl('canvasStage');
     if (c) c.classList.remove('grabbing');
     App.canvasPanState = null;
+    //真实发生过位移的平移结束后，浏览器补发的 click 应被吞掉（否则
+    //它会走空白单击路径清除刚保留下来的高亮）。无位移的空白单击
+    //(_panActuallyMoved=false) 不吞，照常清除高亮/选中。
+    //仅在关联高亮激活时吞掉平移补发的 click：无高亮时保持历史行为
+    //（平移松手的 click 照旧走空白单击路径）。
+    App._panJustFinished = App._panActuallyMoved && !!App.hlNodeIds;
+    App._panActuallyMoved = false;
     //仅视图变化：已做防抖，与缩放 / 恢复一致（beforeunload 覆盖
     //防抖窗口内关闭页面的情况）。
     App.debouncedAutoSave();
@@ -7291,7 +7705,8 @@ document.addEventListener('keydown', function(e) {
     btnCloseRegionModal: 'closeRegionModal', btnSaveRegionModal: 'saveRegionModal',
     btnCancelPicker: 'cancelCustomPicker', btnConfirmColor: 'confirmCustomColor',
     btnLangZh: 'setLangZh', btnLangEn: 'setLangEn',
-    btnResetKeybinds: '_resetKeybinds'
+    btnResetKeybinds: '_resetKeybinds',
+    btnResetSnap: '_resetSnapSettings'
   };
   for (const id of Object.keys(BIND_CLICKS)) {
     document.getElementById(id).addEventListener('click', () => App[BIND_CLICKS[id]]());
@@ -7311,38 +7726,26 @@ document.addEventListener('keydown', function(e) {
     });
   }
 
-  /* 设置："对齐节点"/"分区位置对齐网格" 默认开启（历史沿用的网格吸附），
-     "节点大小对齐"/"分区大小对齐网格" 默认关闭（历史沿用的 1px 粒度）。
-     持久化到 localStorage，使它们在刷新后仍保留。 */
-  App._snapNodes = App._settings.getBool('snapNodes');
-  App._snapSize = App._settings.getBool('snapSize');
-  App._snapRegionPos = App._settings.getBool('snapRegionPos');
-  App._snapRegionSize = App._settings.getBool('snapRegionSize');
+  /* 对齐设置 4 项（接线映射见 App._snapToggleDefs，默认值 = _settings 表 def，
+     当前 4 项出厂全开）：加载持久化值 → App 字段；下方开关勾选与
+     "重置对齐设置"共用同一份映射，默认值不在此重复。 */
+  for (const d of App._snapToggleDefs) {
+    App[d.field] = App._settings.getBool(d.store);
+  }
   App._chromeHidden = App._settings.getBool('chromeHidden');
   if (App._chromeHidden) {
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.add('hide-chrome');
   }
-  document.getElementById('setSnapNodes').checked = App._snapNodes;
-  document.getElementById('setSnapSize').checked = App._snapSize;
-  document.getElementById('setSnapRegionPos').checked = App._snapRegionPos;
-  document.getElementById('setSnapRegionSize').checked = App._snapRegionSize;
-  document.getElementById('setSnapNodes').addEventListener('change', function() {
-    App._snapNodes = this.checked;
-    App._settings.setBool('snapNodes', this.checked);
-  });
-  document.getElementById('setSnapSize').addEventListener('change', function() {
-    App._snapSize = this.checked;
-    App._settings.setBool('snapSize', this.checked);
-  });
-  document.getElementById('setSnapRegionPos').addEventListener('change', function() {
-    App._snapRegionPos = this.checked;
-    App._settings.setBool('snapRegionPos', this.checked);
-  });
-  document.getElementById('setSnapRegionSize').addEventListener('change', function() {
-    App._snapRegionSize = this.checked;
-    App._settings.setBool('snapRegionSize', this.checked);
-  });
+  /* 对齐开关初始勾选 + 变更写回（与上面的加载共用 App._snapToggleDefs 映射） */
+  for (const d of App._snapToggleDefs) {
+    const el = document.getElementById(d.id);
+    el.checked = App[d.field];
+    el.addEventListener('change', function() {
+      App[d.field] = this.checked;
+      App._settings.setBool(d.store, this.checked);
+    });
+  }
   document.getElementById('btnShowSettings').addEventListener('click', () => App.showSettings());
   document.getElementById('btnCloseSettings').addEventListener('click', () => App.closeSettings());
   /* 设置弹窗侧边导航 */

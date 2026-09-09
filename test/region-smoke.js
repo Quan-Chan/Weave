@@ -93,21 +93,32 @@ const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!co
   });
   const x1 = b0.minX - 60, x2 = b0.maxX + 60;
   const y1 = b0.minY - 50, y2 = b0.maxY + 50;
+  // 生成色取绿色：临时预览框颜色与创建完成后的分区颜色应同源
+  const genBefore = await page.evaluate(() => App._selectedGenColor);
+  await page.evaluate(() => { App._setGenColor('green'); });
   await page.keyboard.down('Alt');
   await page.mouse.move(x1, y1);
   await page.mouse.down();
   await page.mouse.move(x2, y2, { steps: 15 });
+  const pv = await page.evaluate(() => {
+    const cs = getComputedStyle(document.getElementById('regionPreview'));
+    return { display: cs.display, border: cs.borderTopColor, bg: cs.backgroundColor, gen: App._selectedGenColor };
+  });
+  ok(pv.display === 'block' && pv.border === 'rgb(16, 185, 129)' && pv.bg === 'rgba(16, 185, 129, 0.07)',
+    '临时分区框颜色跟随生成色 green ' + JSON.stringify(pv));
   await page.mouse.up();
   await page.keyboard.up('Alt');
   await sleep(400);
   const rg = await page.evaluate(() => ({
     count: App.canvasState.regions.length,
     sel: App.selectedNodeIds.size,
-    reg: App.canvasState.regions[0] ? { x: App.canvasState.regions[0].x, y: App.canvasState.regions[0].y, w: App.canvasState.regions[0].w, h: App.canvasState.regions[0].h } : null
+    reg: App.canvasState.regions[0] ? { x: App.canvasState.regions[0].x, y: App.canvasState.regions[0].y, w: App.canvasState.regions[0].w, h: App.canvasState.regions[0].h, color: App.canvasState.regions[0].color } : null
   }));
   ok(rg.count === 1, 'Alt 拖拽创建分区 1 个，实际 ' + rg.count);
   ok(rg.sel === 2, '分区创建后选中 2 个框内节点，实际 ' + rg.sel);
   ok(rg.reg && rg.reg.w > 200, '分区尺寸合理 ' + JSON.stringify(rg.reg));
+  ok(rg.reg && rg.reg.color === 'green', '创建完成的分区颜色为生成色 green ' + JSON.stringify(rg.reg));
+  await page.evaluate(v => { App._setGenColor(v || 'blue'); }, genBefore);
   await page.screenshot({ path: path.join(SHOTS, '01_region_created.png') });
 
   // ── 3) 拖动分区整体移动（框内空白拖动）──
@@ -668,8 +679,8 @@ const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!co
     posDef: App._snapRegionPos,
     sizeDef: App._snapRegionSize
   }));
-  ok(snapUi.posExists && snapUi.sizeExists && snapUi.posDef === true && snapUi.sizeDef === false,
-    '双开关存在：位置默认开、大小默认关 ' + JSON.stringify(snapUi));
+  ok(snapUi.posExists && snapUi.sizeExists && snapUi.posDef === true && snapUi.sizeDef === true,
+    '双开关存在：位置/大小默认均开启 ' + JSON.stringify(snapUi));
   // 视口归位：scale=1、pan=0 → 屏幕相对坐标 == 世界坐标
   await page.evaluate(() => {
     App._snapRegionPos = false;
@@ -716,21 +727,44 @@ const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!co
     return { x: r.x, y: r.y, n: regs.length };
   });
   ok(created2.x % 20 === 0 && created2.y % 20 === 0, '开启位置吸附后创建的分区坐标对齐网格（x=' + created2.x + ', y=' + created2.y + '）');
-  // 尺寸开关独立验证：关 → 框宽高保留像素（起终点 137→333 宽 196）；开 → 宽高为 20 倍数
+  // 尺寸开关独立验证：先显式关闭位置与大小吸附（新默认两者均开启）
+  // → 框宽高保留像素（起终点 137→333 宽 196）；再开启大小 → 宽高为 20 倍数
+  await page.evaluate(() => {
+    App._snapRegionPos = false;
+    document.getElementById('setSnapRegionPos').checked = false;
+    App._snapRegionSize = false;
+    document.getElementById('setSnapRegionSize').checked = false;
+    //清空既有分区，避免 Alt 起点命中旧框而变成"移动分区"而非创建
+    App.canvasState.regions = [];
+    App.saveCanvas();
+  });
+  await page.keyboard.down('Alt');
+  await page.mouse.move(rr18.left + 437, rr18.top + 91);
+  await page.mouse.down();
+  await page.mouse.move(rr18.left + 633, rr18.top + 217, { steps: 8 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await sleep(350);
   const sizeOff = await page.evaluate(() => {
     const regs = App.canvasState.regions;
     const r = regs[regs.length - 1];
     return { w: r.w, h: r.h, sizeOn: App._snapRegionSize };
   });
-  ok(sizeOff.w % 20 !== 0, '分区大小对齐 默认关：创建框宽为像素级（w=' + sizeOff.w + '）');
+  ok(sizeOff.w % 20 !== 0, '分区大小对齐 关闭后：创建框宽为像素级（w=' + sizeOff.w + '）');
+  // 恢复位置吸附（默认开），仅测大小开关
+  await page.evaluate(() => {
+    App._snapRegionPos = true;
+    document.getElementById('setSnapRegionPos').checked = true;
+  });
   await page.evaluate(() => {
     App._snapRegionSize = true;
     document.getElementById('setSnapRegionSize').checked = true;
   });
+  // 起终点避开 sizeOff 画的框（命中已存在分区会变成移动而非创建）
   await page.keyboard.down('Alt');
-  await page.mouse.move(rr18.left + 137, rr18.top + 91);
+  await page.mouse.move(rr18.left + 737, rr18.top + 91);
   await page.mouse.down();
-  await page.mouse.move(rr18.left + 333, rr18.top + 217, { steps: 8 });
+  await page.mouse.move(rr18.left + 933, rr18.top + 217, { steps: 8 });
   await page.mouse.up();
   await page.keyboard.up('Alt');
   await sleep(350);
@@ -740,10 +774,10 @@ const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!co
     return { w: r.w, h: r.h };
   });
   ok(sizeOn.w % 20 === 0 && sizeOn.h % 20 === 0, '开启分区大小对齐：创建框宽高为网格倍数（w=' + sizeOn.w + ', h=' + sizeOn.h + '）');
-  // 恢复默认（位置开/大小关），供后续步骤使用
+  // 恢复默认（位置/大小均开启），供后续步骤使用
   await page.evaluate(() => {
-    App._snapRegionSize = false;
-    document.getElementById('setSnapRegionSize').checked = false;
+    App._snapRegionSize = true;
+    document.getElementById('setSnapRegionSize').checked = true;
   });
   await page.screenshot({ path: path.join(SHOTS, '16_snap_region.png') });
 

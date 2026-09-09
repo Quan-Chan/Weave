@@ -35,6 +35,8 @@
 | 收起功能 | cd test && npm run test:collapse |
 | 分区功能 | cd test && npm run test:region |
 | fold 渲染族 | cd test && npm run test:fold |
+| 关联高亮 | cd test && npm run test:hl |
+| 对齐设置 | cd test && npm run test:snap |
 | 撤销历史 | cd test && npm run test:undo |
 | 历史 bug 回归 | cd test && npm run test:repro |
 | 提交前完整回归 | cd test && npm test |
@@ -46,6 +48,8 @@ npm scripts 与测试文件的对应关系：
 - test:collapse = collapse-test.js + collapse-edge-test.js
 - test:region = region-smoke.js
 - test:fold = fold-click-badge-test.js + fold-flush-sync-test.js + fold-zoom-twitch-test.js
+- test:hl = hl-smoke.js + hl-keybind-test.js + hl-keybind-ui-test.js
+- test:snap = snap-reset-test.js
 - test:undo = undo-cap-test.js
 - test:repro = repro-bugs.js
 - test:fast = geom-unit-test.js + check-structure.js

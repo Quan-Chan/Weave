@@ -98,6 +98,41 @@ const fail = msg => { throw new Error(msg); };
   console.log('step7 bad archive cleanup:', JSON.stringify(bad));
   if (!bad.has || bad.len !== 1 || bad.ids[0] !== 'x_B') fail('坏存档: 应剔除缺失 id 引用');
 
+  // ── 5) 删除最后一条出向连线 → 输出连接点徽标回到常规圆点 ──
+  await page.evaluate(() => {
+    const mk = (label, x, y) => ({ id: 'x_' + label, label, desc: '', color: 'blue', x, y, mirrored: false, w: 170, h: 80 });
+    App.canvasState.nodes = [mk('A', 0, 0), mk('B', 320, 0)];
+    App.canvasState.connections = [{ id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false }];
+    App._nodeZOrder = App.canvasState.nodes.map(n => n.id);
+    App.saveCanvasSnapshot();
+    App.renderCanvas();
+  });
+  await sleep(300);
+  const badge0 = await page.evaluate(() => {
+    const el = App._nodeElMap.get('x_A');
+    return {
+      can: App._canToggleCollapse('x_A'),
+      avail: el.querySelector('.socket.out').classList.contains('fold-avail'),
+      fold: getComputedStyle(el.querySelector('.socket-fold')).display
+    };
+  });
+  console.log('step8 badge before delete:', JSON.stringify(badge0));
+  if (!badge0.can || !badge0.avail || badge0.fold === 'none') fail('删连线: 删除前应显示 − 徽标 ' + JSON.stringify(badge0));
+  await page.evaluate(() => { App._deleteConnection('c_AB'); });
+  await sleep(300);
+  const badge1 = await page.evaluate(() => {
+    const el = App._nodeElMap.get('x_A');
+    return {
+      can: App._canToggleCollapse('x_A'),
+      avail: el.querySelector('.socket.out').classList.contains('fold-avail'),
+      fold: getComputedStyle(el.querySelector('.socket-fold')).display,
+      inner: getComputedStyle(el.querySelector('.socket.out .socket-inner')).display
+    };
+  });
+  console.log('step9 badge after delete:', JSON.stringify(badge1));
+  if (badge1.can || badge1.avail || badge1.fold !== 'none') fail('删连线: 徽标应随最后一条连线删除而消失 ' + JSON.stringify(badge1));
+  if (badge1.inner === 'none') fail('删连线: 应恢复中心圆点 ' + JSON.stringify(badge1));
+
   console.log('ALL EDGE PASSED');
   } finally {
     await cleanup();

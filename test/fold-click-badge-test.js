@@ -1,7 +1,7 @@
 
 'use strict';
 // 【fold 渲染回归族 1/3 · 徽标点击/拖拽显隐】
-// 验证: 点击(不拖拽)时 fold 徽标保持可见(不误触收起);真拖拽时徽标隐藏
+// 验证: 点击(不拖拽)时 fold 徽标保持可见(不误触收起);真拖拽时徽标保持可见(socket 仅放大)
 // 已迁移至统一台架 test/helpers/launch.js
 const { launchBrowser, openApp, sleep } = require('./helpers/launch.js');
 (async () => {
@@ -36,7 +36,8 @@ const { launchBrowser, openApp, sleep } = require('./helpers/launch.js');
     const out = App._nodeElMap.get('x_A').querySelector('.socket.out');
     const fold = App._nodeElMap.get('x_A').querySelector('.socket-fold');
     const sf = getComputedStyle(fold);
-    return { dragging: out.classList.contains('dragging'), foldDisplay: sf.display, foldOp: sf.opacity, outScale: +new DOMMatrixReadOnly(getComputedStyle(out).transform).a.toFixed(3) };
+    const inner = App._nodeElMap.get('x_A').querySelector('.socket.out .socket-inner');
+    return { dragging: out.classList.contains('dragging'), foldDisplay: sf.display, foldOp: sf.opacity, innerDisplay: getComputedStyle(inner).display, outScale: +new DOMMatrixReadOnly(getComputedStyle(out).transform).a.toFixed(3) };
   });
   let failures = 0;
   const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!cond) failures++; };
@@ -64,9 +65,11 @@ const { launchBrowser, openApp, sleep } = require('./helpers/launch.js');
   await sleep(50);
   const dgSnap = await snap();
   console.log('drag move:', JSON.stringify(dgSnap));
-  // 断言 2: 真拖拽时(已收起 + 拖线)徽标必须隐藏,避免与拖动混淆
-  ok(dgSnap.dragging && dgSnap.foldDisplay === 'none',
-    '拖拽态下 fold 徽标隐藏 (dragging=' + dgSnap.dragging + ', display=' + dgSnap.foldDisplay + ')');
+  // 断言 2: 真拖拽时徽标保持可见(中心元素不消失),socket 放大到 1.6×
+  ok(dgSnap.dragging && dgSnap.foldDisplay !== 'none',
+    '拖拽态下 fold 徽标保持可见 (dragging=' + dgSnap.dragging + ', display=' + dgSnap.foldDisplay + ')');
+  ok(Math.abs(dgSnap.outScale - 1.6) < 0.01,
+    '拖拽态下 socket 放大 1.6× (scale=' + dgSnap.outScale + ')');
   await page.mouse.up();
   await sleep(100);
   const adSnap = await snap();

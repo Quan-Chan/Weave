@@ -21,6 +21,8 @@
 - **Nodes** — add, delete, select (click / box-select / multi-select), drag to move, inline editing, copy & paste
 - **Connections** — create by dragging sockets, delete, edit labels, custom Bézier curve adjustments
 - **Regions** — draw a region frame (Region key / Alt+drag), move it with its contained nodes, edit name/color or delete via right-click, nodes dragged in are owned automatically
+- **Collapse chains** — click the − badge on a node's output socket to collapse the chain after it, + to expand; nesting supported
+- **Linked highlight** — hold Alt and click a node to highlight its directly linked nodes and connections, with a slight blur on everything else
 - **Canvas** — pan (drag / middle button), wheel zoom, fit view, editable coordinate HUD
 - **Colors** — 5 presets + custom color-wheel picker, Ctrl+wheel to cycle quickly
 - **Import / Export** — JSON import/export (with viewport info), PNG export, drag-and-drop JSON import

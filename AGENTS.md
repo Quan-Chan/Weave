@@ -30,6 +30,17 @@
 - 每次修改后运行 `node test/gui-smoke.js`（冒烟）
 - 大规模重构后运行 `node test/diff-test.js`（与原版逐步骤一致性比对）
 
+## 文档分配（docs/）
+
+项目说明文档统一放在 docs/ 目录，各文件分工如下：
+
+- **development-workflow.md**：开发流程。功能修改按 实现功能 → 测试功能 → 优化代码质量 三阶段顺序执行，并规定各阶段的具体做法。
+- **documentation-and-comments.md**：文档与注释规范。编写或修改任何文档、注释时必须遵守的书写规则（措辞、结构与表达约束）。
+- **application-form.md**：软件本体形式。描述 APPs/Weave.html 的存在形式（单 HTML 文件、内联样式脚本）、技术栈、界面语言与浏览器兼容性说明的位置。
+- **weave_docs_guide.json**：文档导读图。以本软件画布格式存储的 docs/ 导读节点图，可在画布中导入查看。
+
+以上文档中，development-workflow.md 与 application-form.md 引用本文件（AGENTS.md）作为代码结构规则的全文来源；本文档为开发约定的总入口。
+
 ## 功能概览
 
 - **节点**：添加、删除、选中（单击 / 框选 / 多选）、拖拽移动、内联编辑、复制粘贴
