@@ -1,0 +1,43 @@
+name: Deploy Pages
+
+# 站点根目录的 index.html 由 APPs/Weave.html 复制而来（构建产物，源树不保存副本）。
+# 每次 main 收到推送即重新部署，在线版与仓库主程序保持一致。
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 组装站点产物
+        run: |
+          mkdir -p _site
+          cp APPs/Weave.html _site/index.html
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
