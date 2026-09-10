@@ -5,6 +5,10 @@ on:
     branches: [ main, master ]
   pull_request:
 
+# 工作流只读取仓库内容，显式限制 GITHUB_TOKEN 权限
+permissions:
+  contents: read
+
 jobs:
   # ── Job 1: 快速静态门禁(结构守护 + 纯函数单测) ──
   quick:

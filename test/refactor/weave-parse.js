@@ -14,18 +14,26 @@ function readHtml() {
   return fs.readFileSync(HTML_PATH, 'utf8');
 }
 
-// 提取 <script> 块内容（应用只有一个 <script>）
+// 提取 <script> 块内容（应用只有一个 <script>）。
+// 标签名按 HTML 规则不区分大小写，开标签允许带属性。
+const RE_SCRIPT_OPEN = /<script\b[^>]*>/i;
+const RE_SCRIPT_CLOSE = /<\/script\s*>/i;
+
 function extractScript(html) {
-  const m = html.match(/<script>([\s\S]*?)<\/script>/);
-  if (!m) throw new Error('未找到 <script> 块');
-  return m[1];
+  const open = RE_SCRIPT_OPEN.exec(html);
+  if (!open) throw new Error('未找到 <script> 块');
+  const close = RE_SCRIPT_CLOSE.exec(html.slice(open.index + open[0].length));
+  if (!close) throw new Error('未找到 </script> 块');
+  return html.slice(open.index + open[0].length, open.index + open[0].length + close.index);
 }
 
 function scriptRange(html) {
-  const start = html.indexOf('<script>');
-  const end = html.indexOf('</script>');
-  if (start === -1 || end === -1) throw new Error('未找到 <script> 块');
-  return { start: start + '<script>'.length, end };
+  const open = RE_SCRIPT_OPEN.exec(html);
+  if (!open) throw new Error('未找到 <script> 块');
+  const start = open.index + open[0].length;
+  const close = RE_SCRIPT_CLOSE.exec(html.slice(start));
+  if (!close) throw new Error('未找到 </script> 块');
+  return { start, end: start + close.index };
 }
 
 // ── 词法扫描：跳过字符串/注释/正则字面量，逐字符产出"结构字符" ──
