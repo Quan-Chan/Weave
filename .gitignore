@@ -26,4 +26,3 @@ test/samples/weave_250_fullmesh.json
 # 一次性重构工具；weave-parse.js 是 check-structure.js 的运行时依赖，保留入库
 test/refactor/*
 !test/refactor/weave-parse.js
-

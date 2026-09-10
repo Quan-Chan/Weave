@@ -1,4 +1,0 @@
-fix: 修复代码扫描报告的两处问题
-
-- test/refactor/weave-parse.js 的 script 标签匹配改为不区分大小写并允许开标签带属性，避免大写标签或带属性标签导致解析失败
-- ci.yml 显式声明 permissions: contents: read，限制 GITHUB_TOKEN 权限
