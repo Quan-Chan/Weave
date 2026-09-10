@@ -14,7 +14,7 @@
 
 `APPs/Weave.html` 是 Weave 唯一的应用程序文件，严禁拆分为多文件结构。所有 HTML、CSS、JavaScript 必须内联在同一文件中。外部资源（如字体）从 CDN 加载，不引入本地文件依赖。
 
-同目录下 `APPs/Weave.min.html` 是 `test/build-min.js` 生成的压缩发布版，不手工编辑；`APPs/数据流图.html` 是无关的历史应用。
+同目录下 `APPs/Weave.min.html` 是 `test/build-min.js` 生成的压缩发布版，不手工编辑；同目录的其他 HTML 文件为独立的历史应用，与 Weave 无关。
 
 ### 2. 每次修改后必须测试
 
@@ -45,13 +45,14 @@
 - **documentation-and-comments.md**：文档与注释规范。规定 docs/ 文档与代码注释的书写规则（措辞、结构与表达约束），文件开头给出适用范围。
 - **application-form.md**：软件本体形式。描述 APPs/Weave.html 的存在形式、技术栈、界面语言、数据模型、渲染结构、模块划分与代码规则。
 - **weave_docs_guide.json**：文档导读图。以本软件画布格式存储的 docs/ 导读节点图，可在画布中导入查看。
-- **release-workflow.md**：发布流程。描述私有开发库与公开发布库的对应关系、同步时排除的路径与版本发布步骤。仅存在于私有开发库，公开发布库不含该文件。
 
 docs/ 之外的相关文档：
 
 - **test/README.md**：测试台架、测试清单与结构守护的说明。
 - **UnsupportedBrowsers/README.md**：不兼容浏览器的记录与处理结论。
 - **CHANGELOG.md**：按版本记录新功能、改进与修复。
+
+发布流程说明只在私有开发库维护（docs/release-workflow.md），描述两库的对应关系、同步时排除的路径与版本发布步骤；公开发布库不含该文件。
 
 引用关系：development-workflow.md 引用本文件作为代码结构规则的全文来源；application-form.md 引用 test/README.md 与 development-workflow.md 作为结构与流程的延伸说明。本文档为开发规则的总入口。
 

@@ -9,7 +9,7 @@ APPs/Weave.html 是 Weave 唯一的应用程序文件。所有 HTML、CSS、Java
 APPs/ 目录下另有：
 
 - APPs/Weave.min.html — 由 test/build-min.js 生成的压缩发布版，存档格式与 localStorage 键与完整版一致
-- APPs/数据流图.html — 独立的历史应用，与 Weave 无关
+- 其他 HTML 文件 — 独立的历史应用，与 Weave 无关
 
 APPs/Weave.html 的浏览器兼容性说明见 ../UnsupportedBrowsers/README.md。
 
