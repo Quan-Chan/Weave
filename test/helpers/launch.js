@@ -5,7 +5,7 @@
 //  - setupChain(page)   布置 A→B→C(+D) 标准链
 //  - dblClick(page, cdp, x, y)  CDP 双击(clickCount 1→2)
 //  - screenPt / 公共断言辅助
-// 用法: const { launchWeave, setupChain, dblClick, ok, closeBrowser } = require('./helpers/launch');
+// 用法: const { launchBrowser, openApp, dblClick, setupChain, mkNode } = require('./helpers/launch');
 const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');

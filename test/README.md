@@ -18,7 +18,7 @@ cd test && npm test          # 统一入口: 串行跑全部断言型测试
 | 改 Weave.html 任意代码 | `npm run test:structure` + `npm run test:gui` | ~1min |
 | 改某功能域(collapse/region/undo…) | 对应 `npm run test:<域>` | ~1-2min |
 | 提交前完整回归 | `npm test` | ~5min |
-| 模块化重构前(不常做) | `node diff-test.js`(先提交当前改动) | ~3min |
+| 模块化重构前(不常做) | `node test/diff-test.js`(重构前先提交既有改动) | ~3min |
 
 **推荐开发循环**:
 1. 改代码 → 立即 `test:structure`(结构守护,秒级)
@@ -46,24 +46,27 @@ if [ $? -ne 0 ]; then echo "❌ 结构/单测未通过,禁止提交"; exit 1; fi
 | quick | 结构守护 + 纯函数单测(秒级) | 每次 push/PR |
 | gui | 全量 GUI 回归(ubuntu + Chrome + 中文字体) | 每次 push/PR |
 
-- 浏览器经 `WEAVE_EDGE` 环境变量注入(`/usr/bin/google-chrome`),脚本已全部参数化(不再硬编码作者路径)
+- 浏览器经 `WEAVE_EDGE` 环境变量注入(`/usr/bin/google-chrome`)。`test/` 下的测试脚本均读取该变量,缺省回退作者机 Edge 路径;`test/tools/` 与 `test/refactor/` 下的辅助脚本仍硬编码
 - 失败自动归档 `test/shots*/**/*.png` 截图(artifact: test-shots,保留 7 天)
 - `diff-test.js` 不入 CI:它对比 git HEAD 原版,仅重构前手动运行
 
-> 本地跑 CI 等效: `WEAVE_EDGE=/path/to/chrome npm test`(Windows 同法指向 Edge/Chrome 可执行文件)
+> 本地跑 CI 等效: `cd test && WEAVE_EDGE=/path/to/chrome npm test`
+> (Windows: `$env:WEAVE_EDGE='C:\path\to\msedge.exe'; npm test`)
 
 ## 统一测试台架 helpers/
 
 `test/helpers/launch.js` 提供浏览器启动/页面就绪/公共交互,新测试应优先复用:
 
-- `launchBrowser(headed)` — 自动 `puppeteer.launch`,失败(沙箱 EPERM)回退手动 spawn+connect
+- `launchBrowser(headed)` — 自动 `puppeteer.launch`,失败(沙箱 EPERM)回退手动 spawn+connect,返回 { browser, mode, cleanup }
 - `openApp(browser)` — 打开应用、等就绪、关首启弹窗,返回 { page, cdp }
 - `dblClick(page, cdp, x, y)` — CDP 双击(clickCount 1→2)
+- `setupChain(page, nodes, conns)` — 按给定节点与连线布置标准链
 - `mkNode(id,label,x,y)` / `installFactories(page)` — 布置工厂(注入页面级 `__testMk/__testChain/__testReset`)
-- `sleep` / `shotsDir(name)`
+- `sleep` / `shotsDir(name)` / `EDGE` / `APP_URL`
 
-已迁移: fold-flush-sync / collapse-edge / fold-click-badge / fold-zoom-twitch / undo-cap(新)。
-旧脚本(gui-smoke/region-smoke/collapse-test/node-drag-snap)仍自带样板,迁移进行中。
+已迁移: fold-flush-sync / collapse-edge / fold-click-badge / fold-zoom-twitch / undo-cap。
+未迁移(仍自带样板): gui-smoke / region-smoke / collapse-test / node-drag-snap / hl-smoke /
+hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 
 ## 测试
 
@@ -71,10 +74,11 @@ if [ $? -ne 0 ]; then echo "❌ 结构/单测未通过,禁止提交"; exit 1; fi
 
 | 文件 | 层级 | 职责 | 何时跑 |
 |---|---|---|---|
+| check-version.js | 静态 | 版本号一致性(应用/CHANGELOG/git tag) | 发版或改版本号后 |
 | check-structure.js | 静态 | 模块化结构守护(M01→M13/条目等价) | 每次改 Weave.html 后 |
 | geom-unit-test.js | 单测 | collapse 闭包/多父冲突纯函数 | 每次改 collapse 逻辑 |
 | gui-smoke.js | 冒烟 | 核心交互主路径(建节点/连线/设置/i18n) | 每次改 Weave.html 后 |
-| region-smoke.js | 专项 | 分区全功能(61 断言) | 改分区相关后 |
+| region-smoke.js | 专项 | 分区全功能(63 断言) | 改分区相关后 |
 | collapse-test.js | 专项 | 收起主流程(需求1-5) | 改 collapse 后 |
 | collapse-edge-test.js | 专项 | 收起边界(撤销/删除/序列化) | 改 collapse/undo 后 |
 | fold-click-badge-test.js | 回归 | fold 渲染族1: 徽标点击/拖拽显隐 | 改 socket/fold 渲染后 |
@@ -84,13 +88,22 @@ if [ $? -ne 0 ]; then echo "❌ 结构/单测未通过,禁止提交"; exit 1; fi
 | hl-keybind-test.js | 专项 | 关联高亮键位自定义(改绑后手势切换) | 改键位/关联高亮后 |
 | hl-keybind-ui-test.js | 专项 | 设置弹窗中关联高亮键位的录制/显示/重置 | 同上 |
 | snap-reset-test.js | 专项 | 对齐设置重置(方法调用 + UI 点击双路径) | 改对齐设置后 |
-| node-drag-snap-test.js | 专项 | 节点拖拽吸附动画/监听泄漏 | 改吸附/动画后 |
+| node-drag-snap-test.js | 专项 | 节点拖拽吸附动画/监听泄漏 | 改吸附/动画后(`test:dragsnap`) |
 | undo-cap-test.js | 专项 | 撤销栈 50 步上限 | 改 undo/历史后 |
 | repro-bugs.js | 回归 | 三个历史 bug 不再复现 | 改 collapse/导入/手势后 |
 | diff-test.js | 差分 | git HEAD 双页对比(**仅重构前适用**) | 模块化重构前手动 |
 | build-min.js | 工具 | 生成 Weave.min.html(**非测试**) | 发布时 |
 
-> 命名规范: `{功能}-{层级}-test.js`;fold-* 三探针同属"fold 渲染回归族"。
+> 命名规范: `{功能}-{层级}-test.js`。`*-smoke.js`(gui/region/hl)、`check-structure.js`、
+> `repro-bugs.js` 为规范确定前的历史命名,保持不改。
+
+### 压测存档与工具(非测试)
+
+- `test/samples/` — 手工导入用存档,不被自动化测试引用
+  - `test/samples/weave_250_nodes.json` — 250 节点、465 连线的常规图
+  - `test/samples/weave_arrow_demo.json` — 6 节点、4 连线的箭头形状演示
+  - `test/samples/gen-fullmesh.cmd` + `test/samples/gen-fullmesh.js` — 生成 250 节点、62250 连线的有向全连接压测存档;产物 `test/samples/weave_250_fullmesh.json` 体积较大,不入库
+- `test/tools/png-diff.js`、`test/tools/pixel-dump.js` — 截图与像素比对辅助
 
 ### GUI 冒烟测试
 
@@ -130,7 +143,7 @@ node test/region-smoke.js           # 无头运行
 node test/diff-test.js
 ```
 
-注意：须在 **工作区未提交重构改动** 时运行（原版取自 git HEAD）。测试截图在 `test/shots-diff/`。
+注意：须在重构改动尚未提交、既有工作已提交时运行（原版取自 git HEAD）。测试截图在 `test/shots-diff/`。
 
 ### 撤销/重做上限测试（undo-cap-test.js）
 
@@ -154,11 +167,11 @@ node test/check-structure.js              # 校验（无参数）
 
 - 脚本语法（`new Function` 编译）
 - 模块 banner 顺序 = M01 → … → M13，且各出现一次
-- DOM id 集合与 golden 一致（84 个）
+- DOM id 集合与 golden 一致（104 个）
 - 常量区 / 尾部区（注释与空白归一化后）逐字一致
 - **App 条目逐条等价** —— 每个方法/状态字段的"名称 + 类型 + 归一化函数体"与 golden 逐一比对
-  （267 条 → Phase 2 后为 254 条 App + 13 条 Weave.* 命名空间成员）
-- `Weave.*` 命名空间成员逐条等价
+  （349 条 = 252 方法 + 97 状态字段）
+- `Weave.*` 命名空间成员逐条等价（41 个）
 
 golden.json 的 `movedOut` / `renames` 记录 Phase 2 从 App 提取到 `Weave.Util/Color/Geom`
 的纯函数及其调用点重命名，比对时对 golden 侧应用同样的重命名。
@@ -168,27 +181,28 @@ golden.json 的 `movedOut` / `renames` 记录 Phase 2 从 App 提取到 `Weave.U
 | 模块 | 内容 | 依赖 |
 | --- | --- | --- |
 | M01 常量与工具 | 全局常量 + Weave.Util/Color/Geom | 无 |
-| M02 状态与持久化 | App 声明、状态、基础设施、历史/序列化/自动保存 | M01 |
-| M03 颜色系统 | 预设/自定义色、色轮、生成色 | M01, M02 |
-| M04 视图与相机 | 平移/缩放/居中/网格/坐标状态指示 | M01, M02 |
-| M05 渲染·节点 | 节点 DOM、renderCanvas 编排 | M02, M04 |
-| M06 渲染·连线 | 贝塞尔几何、箭头、SVG、空间索引 | M01, M02 |
-| M07 动画 | 网格吸附动画 | M02, M05 |
-| M08 输入手势 | 拖拽/框选/平移/键位映射 | M02, M04 |
-| M09 节点编辑 | 增删改查（CRUD）、剪贴板、内联编辑、详情、上下文菜单动作 | M02, M03, M05, M08, M10 |
-| M10 连线编辑 | 创建/删除、曲线手柄、标签、选择 | M02, M06 |
-| M11 界面外壳 | 右键菜单、弹窗、设置、键位录制、专注模式 | M02, M08, M09, M10 |
-| M12 导入导出 | JSON/PNG 双通道 | M02, M05 |
-| M13 装配与启动 | 全局事件、快捷键、启动初始化 | 全部 |
+| M02 状态与持久化 | App 声明、状态、基础设施、历史/序列化/自动保存/导入恢复 | M01 |
+| M03 颜色系统 | 预设/自定义色、色轮、生成色下拉、自定义选择器 | M01, M02 |
+| M04 视图与相机 | 平移/缩放/居中/网格绘制/坐标 HUD | M01, M02 |
+| M05 渲染·节点 | 节点 DOM 创建/更新、renderCanvas 编排、z 序、溢出刷新 | M02, M04 |
+| M06 渲染·连线 | 贝塞尔几何、箭头、SVG 渲染、空间索引、增量平移、分区渲染 | M01, M02 |
+| M07 动画 | 网格吸附动画（240Hz 数据流 + rAF 渲染流） | M02, M05 |
+| M08 输入手势 | 节点拖/线拖/框选/平移/滚轮/键位映射、分区手势、JSON 文件拖拽导入 | M02, M04 |
+| M09 节点编辑 | CRUD、剪贴板、内联编辑、详情弹窗、上下文菜单动作、收起/展开节点串、分区编辑 | M02, M03, M05, M08, M10 |
+| M10 连线编辑 | 创建/删除、曲线手柄、标签编辑、选择维护 | M02, M06 |
+| M11 界面外壳 | 右键菜单、关于/设置弹窗、键位录制、专注模式、状态徽标、Σ 彩蛋 | M02, M08, M09, M10 |
+| M12 导入导出 | JSON 导入导出、PNG 导出（DOM 快照 + legacy 双通道） | M02, M05 |
+| M13 装配与启动 | 全局事件监听、快捷键、Init 初始化 | 全部 |
 
 ### 重构工具（一次性，已忽略）
 
-`test/refactor/`（`partition.js` 模块化重构生成器、注释翻译脚本及中间产物）已从版本库
-移除（见 `.gitignore`），仅保留在本地历史中。README 不再维护其用法说明。
+`test/refactor/` 下的重构工具（`partition.js` 模块化重构生成器、注释翻译脚本及中间产物）
+已从版本库移除（见 `.gitignore`），仅保留在本地历史中，README 不再维护其用法说明。
+其中 `test/refactor/weave-parse.js` 是 `check-structure.js` 的运行时依赖（脚本解析器），保留入库。
 
 ## 说明
 
-- Edge 路径硬编码在脚本顶部 `EDGE`，换机器/浏览器时改这一行
+- `test/` 下的测试脚本从 `WEAVE_EDGE` 环境变量读取浏览器路径，缺省回退作者机 Edge 路径；换机器或浏览器时设该变量即可
 - 双击必须用 CDP `clickCount` 递增（1→2）序列：headless Chromium 对两次
   `clickCount:1` 的普通 click 不派发 `dblclick`（`page.mouse.click` 正是这种）
 - 截图当前仅作人工查看/归档用途（自动化脚本用 DOM 断言/像素比较，不人工读图）

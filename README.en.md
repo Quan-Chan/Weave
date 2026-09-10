@@ -11,7 +11,7 @@
 </p>
 
 1. **Use online** — open [quan-chan.github.io/Weave](https://quan-chan.github.io/Weave/) and use it directly; no download needed
-2. **Download** — download `APPs/Weave.html`, the only application file; no installation needed
+2. **Download** — download `APPs/Weave.html` (full) or `APPs/Weave.min.html` (minified, same features); no installation needed
 3. **Open** — open it in any modern browser (Chrome / Edge / Firefox / Safari)
 4. **Use** — double-click the canvas to create a node, drag sockets to connect nodes, double-click text to edit it inline
 
@@ -19,7 +19,7 @@
 
 <h2>Features</h2>
 
-- **Nodes** — add, delete, select (click / box-select / multi-select), drag to move, inline editing, copy & paste
+- **Nodes** — add, delete, select (click / box-select / multi-select), drag to move, inline editing, copy & paste, resize via right-click
 - **Connections** — create by dragging sockets, delete, edit labels, custom Bézier curve adjustments
 - **Regions** — draw a region frame (Region key / Alt+drag), move it with its contained nodes, edit name/color or delete via right-click, nodes dragged in are owned automatically
 - **Collapse chains** — click the − badge on a node's output socket to collapse the chain after it, + to expand; nesting supported
@@ -27,7 +27,7 @@
 - **Canvas** — pan (drag / middle button), wheel zoom, fit view, editable coordinate HUD
 - **Colors** — 5 presets + custom color-wheel picker, Ctrl+wheel to cycle quickly
 - **Import / Export** — JSON import/export (with viewport info), PNG export, drag-and-drop JSON import
-- **More** — undo/redo (up to 50 steps), read-only mode, auto-save to localStorage, focus mode (Ctrl+H), language switch (中文 / English) in Settings, customizable keybindings (shown on first launch)
+- **More** — undo/redo (up to 50 steps), read-only mode, auto-save to localStorage, focus mode (Ctrl+H), language switch (中文 / English) in Settings, customizable keybindings (shown on first launch), alignment settings (node position/size and region position/size snapped to grid, resettable)
 
 <hr>
 
@@ -45,10 +45,12 @@ Weave is built with pure front-end technologies — no frameworks, no dependenci
 
 <h2>Performance test data</h2>
 
-Two test archives are bundled for performance stress-testing. Load them in Weave via **Import** (the JSON import button, or drag-and-drop the file onto the canvas):
+Archives for stress-testing and demos are bundled under `test/samples/`. Load them in Weave via **Import** (the JSON import button, or drag-and-drop the file onto the canvas):
 
 - **`test/samples/weave_250_nodes.json`** — a regular graph with 250 nodes and 465 connections
-- **`test/samples/weave_250_fullmesh.json`** — a full-mesh graph with 250 nodes and 62,250 connections, for extreme stress-testing
+- **`test/samples/weave_arrow_demo.json`** — a 6-node, 4-connection arrow shape demo
+
+The full-mesh graph (250 nodes, 62,250 connections) is too large to bundle. Double-click `test/samples/gen-fullmesh.cmd` (or run `node gen-fullmesh.js` inside `test/samples/`) to generate `weave_250_fullmesh.json`, then load it via **Import**.
 
 <hr>
 

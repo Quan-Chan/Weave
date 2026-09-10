@@ -30,6 +30,8 @@
 
 | 修改范围 | 命令 |
 |---|---|
+| 纯函数修改（Weave.*） | cd test && npm run test:fast |
+| 版本号修改 | cd test && npm run test:version |
 | 任意代码修改后，结构守护 | cd test && npm run test:structure |
 | Weave.html 修改，GUI 冒烟 | cd test && npm run test:gui |
 | 收起功能 | cd test && npm run test:collapse |
@@ -37,6 +39,7 @@
 | fold 渲染族 | cd test && npm run test:fold |
 | 关联高亮 | cd test && npm run test:hl |
 | 对齐设置 | cd test && npm run test:snap |
+| 吸附动画 | cd test && npm run test:dragsnap |
 | 撤销历史 | cd test && npm run test:undo |
 | 历史 bug 回归 | cd test && npm run test:repro |
 | 提交前完整回归 | cd test && npm test |
@@ -50,21 +53,23 @@ npm scripts 与测试文件的对应关系：
 - test:fold = fold-click-badge-test.js + fold-flush-sync-test.js + fold-zoom-twitch-test.js
 - test:hl = hl-smoke.js + hl-keybind-test.js + hl-keybind-ui-test.js
 - test:snap = snap-reset-test.js
+- test:dragsnap = node-drag-snap-test.js
 - test:undo = undo-cap-test.js
 - test:repro = repro-bugs.js
-- test:fast = geom-unit-test.js + check-structure.js
+- test:fast = check-version.js + geom-unit-test.js + check-structure.js
+- test:version = check-version.js
 
 单独运行单个测试文件：在仓库根目录执行 node test/文件名.js。测试台架与测试清单见 ../test/README.md。
 
 CI：push 或 PR 触发 quick（结构守护与纯函数单测）与 gui（GUI 回归）两个任务。CI 失败的处理方式与本地测试失败相同。
 
-diff-test.js 在模块化重构前对 git HEAD 原版与工作区逐步比对。功能开发叠加后与 HEAD 的差异属预期，该测试不作为日常门禁。
+diff-test.js 在模块化重构前对 git HEAD 原版与工作区逐步比对。功能开发叠加后与 HEAD 的差异属预期，该测试不纳入 npm test 与 CI，仅在重构前手动运行。
 
 新功能的测试：
 
-- 文件命名 {功能}-{层级}-test.js，层级取值为 gui、region、collapse、undo 等测试类别，现有文件清单见 ../test/README.md
+- 文件命名 {功能}-{层级}-test.js，层级取值为 gui、region、collapse、undo 等测试类别，现有文件清单与命名例外见 ../test/README.md
 - 复用 test/helpers/launch.js 的 launchBrowser、openApp、dblClick、installFactories
-- 加入 test/package.json 的 scripts.test
+- 加入 test/package.json 的 scripts.test 与对应域分组脚本
 
 ## 优化代码质量
 

@@ -1,25 +1,28 @@
 {
-  "name": "test",
+  "name": "weave-test",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Weave 结构守护与 GUI 回归测试",
+  "private": true,
   "scripts": {
-    "test": "node check-structure.js && node gui-smoke.js && node region-smoke.js && node collapse-test.js && node collapse-edge-test.js && node fold-click-badge-test.js && node fold-flush-sync-test.js && node fold-zoom-twitch-test.js && node hl-smoke.js && node hl-keybind-test.js && node hl-keybind-ui-test.js && node snap-reset-test.js && node node-drag-snap-test.js && node undo-cap-test.js && node geom-unit-test.js && node repro-bugs.js",
+    "test": "node check-version.js && node check-structure.js && node gui-smoke.js && node region-smoke.js && node collapse-test.js && node collapse-edge-test.js && node fold-click-badge-test.js && node fold-flush-sync-test.js && node fold-zoom-twitch-test.js && node hl-smoke.js && node hl-keybind-test.js && node hl-keybind-ui-test.js && node snap-reset-test.js && node node-drag-snap-test.js && node undo-cap-test.js && node geom-unit-test.js && node repro-bugs.js",
     "test:structure": "node check-structure.js",
     "test:gui": "node gui-smoke.js",
     "test:region": "node region-smoke.js",
     "test:collapse": "node collapse-test.js && node collapse-edge-test.js",
-    "test:fast": "node geom-unit-test.js && node check-structure.js",
+    "test:fast": "node check-version.js && node geom-unit-test.js && node check-structure.js",
+    "test:version": "node check-version.js",
     "test:fold": "node fold-click-badge-test.js && node fold-flush-sync-test.js && node fold-zoom-twitch-test.js",
     "test:hl": "node hl-smoke.js && node hl-keybind-test.js && node hl-keybind-ui-test.js",
     "test:snap": "node snap-reset-test.js",
+    "test:dragsnap": "node node-drag-snap-test.js",
     "test:undo": "node undo-cap-test.js",
     "test:repro": "node repro-bugs.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "dependencies": {
     "puppeteer-core": "^25.7.0"
   }

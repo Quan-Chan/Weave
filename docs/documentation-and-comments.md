@@ -1,6 +1,8 @@
 # 文档与注释规范
 
-编写或修改本项目任何文档、注释时，必须遵守以下规范。
+编写或修改本项目文档、代码注释时，必须遵守以下规范。
+
+适用范围：docs/ 目录下的文档，以及 APPs/Weave.html 内的注释。其余文档不受本规范的行文约束，包括仓库根目录的 README.md、README.en.md、CHANGELOG.md、AGENTS.md，以及 test/README.md、UnsupportedBrowsers/README.md。
 
 ## 禁止
 

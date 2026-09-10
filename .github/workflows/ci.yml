@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: test/package-lock.json
 
@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: test/package-lock.json
 
@@ -48,14 +48,15 @@ jobs:
           sudo apt-get install -y google-chrome-stable fonts-noto-cjk
         # fonts-noto-cjk: 中文界面渲染所需(截图/文本断言依赖字形)
 
+      - name: 解析浏览器路径
+        run: echo "WEAVE_EDGE=$(command -v google-chrome || command -v google-chrome-stable)" >> "$GITHUB_ENV"
+
       - name: 安装依赖 (test/)
         working-directory: test
         run: npm ci --cache ./.npm-cache
 
       - name: 运行 GUI 全量测试
         working-directory: test
-        env:
-          WEAVE_EDGE: /usr/bin/google-chrome
         run: npm test
 
       # 失败时归档截图,便于人工定位(GUI 测试各步截图到 test/shots*/)
@@ -66,10 +67,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-shots
-          path: |
-            test/shots/**/*.png
-            test/shots-region/**/*.png
-            test/shots-collapse/**/*.png
-            test/shots-dragsnap/**/*.png
+          path: test/shots*/**/*.png
           if-no-files-found: ignore
           retention-days: 7

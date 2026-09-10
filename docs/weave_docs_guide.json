@@ -30,12 +30,22 @@
           },
           {
             "id": "doc1_p2",
-            "dx": 29.95,
+            "dx": 30,
             "dy": 0
           },
           {
             "id": "doc1_p3",
             "dx": 45,
+            "dy": 0
+          },
+          {
+            "id": "doc1_p4",
+            "dx": 60,
+            "dy": 0
+          },
+          {
+            "id": "doc1_p5",
+            "dx": 75,
             "dy": 0
           }
         ]
@@ -55,11 +65,11 @@
     {
       "id": "doc1_p2",
       "label": "测试功能",
-      "desc": "确认未破坏已有功能。失败按原因处理: 预期行为变化→更新断言; 移除功能→删除对应测试与断言; 意外回归→修代码返回实现阶段。",
-      "x": 54.95,
+      "desc": "确认未破坏已有功能。按修改范围选命令跑测试; 失败按原因处理: 预期行为变化→更新断言; 移除功能→删除对应测试与断言; 意外回归→修代码返回实现阶段。",
+      "x": 55,
       "y": -9,
       "w": 10,
-      "h": 7,
+      "h": 6,
       "mirrored": false,
       "color": "green"
     },
@@ -68,6 +78,28 @@
       "label": "优化代码质量",
       "desc": "分析新增与修改代码: 模块归属、重复代码、命名、注释合规、结构守护。",
       "x": 70,
+      "y": -9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "green"
+    },
+    {
+      "id": "doc1_p4",
+      "label": "提交",
+      "desc": "首行 类型 + 对象 + 结果, 空行后条目列出变更点。类型: feat/fix/refactor/style/test/chore/docs/revert/ci。",
+      "x": 85,
+      "y": -9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "green"
+    },
+    {
+      "id": "doc1_p5",
+      "label": "文档导读",
+      "desc": "weave_docs_guide.json 是 docs/ 目录的导读存档, 导入画布后按节点图浏览。",
+      "x": 100,
       "y": -9,
       "w": 10,
       "h": 6,
@@ -184,6 +216,26 @@
             "id": "doc3_p4",
             "dx": 60,
             "dy": 0
+          },
+          {
+            "id": "doc3_p5",
+            "dx": 75,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p6",
+            "dx": 90,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p7",
+            "dx": 105,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p8",
+            "dx": 120,
+            "dy": 0
           }
         ]
       }
@@ -191,7 +243,7 @@
     {
       "id": "doc3_p1",
       "label": "存在形式",
-      "desc": "APPs/Weave.html 为唯一应用文件, HTML/CSS/JS 内联, 零本地依赖。",
+      "desc": "APPs/Weave.html 为 Weave 唯一应用文件, HTML/CSS/JS 内联, 零本地依赖。同目录另有压缩发布版与历史应用。",
       "x": 40,
       "y": 9,
       "w": 10,
@@ -201,8 +253,8 @@
     },
     {
       "id": "doc3_p2",
-      "label": "数据模型",
-      "desc": "canvasState = { nodes, connections, regions, history }。内存像素, 存档格单位。",
+      "label": "技术栈",
+      "desc": "纯 JS + HTML5 + CSS3 + Canvas 2D + SVG + localStorage。无框架、无构建步骤; 运行时唯一外部请求是 CDN 字体。",
       "x": 55,
       "y": 9,
       "w": 10,
@@ -212,8 +264,8 @@
     },
     {
       "id": "doc3_p3",
-      "label": "模块划分",
-      "desc": "<script> 13 模块拼接 (M01 常量与工具 → M13 装配与启动), check-structure.js 守护。",
+      "label": "界面语言",
+      "desc": "中文与 English, 切换入口在设置弹窗。文案集中在 M01 的 I18N 字典, App.t(key, params) 取值并替换 {占位符}。",
       "x": 70,
       "y": 9,
       "w": 10,
@@ -223,9 +275,53 @@
     },
     {
       "id": "doc3_p4",
-      "label": "代码规则",
-      "desc": "App 方法简写 + Object.assign 分块; 纯函数入 Weave.*; 内部成员下划线前缀。",
+      "label": "数据模型",
+      "desc": "canvasState = { nodes, connections, regions, history }。内存像素, 存档格单位; 存档另含 viewport。",
       "x": 85,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p5",
+      "label": "渲染结构",
+      "desc": "网格 canvas 在屏幕像素空间; canvas-world 平移层含分区与连线 SVG; canvas-nodes 缩放层嵌于其内; 框选与分区预览为屏幕坐标浮层。",
+      "x": 100,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p6",
+      "label": "模块划分",
+      "desc": "<script> 13 模块拼接 (M01 常量与工具 → M13 装配与启动), check-structure.js 守护。",
+      "x": 115,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p7",
+      "label": "代码规则",
+      "desc": "App 方法简写 + Object.assign 分块; 纯函数入 Weave.*; 内部成员下划线前缀; 箭头方向取自两端节点的 mirrored。",
+      "x": 130,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p8",
+      "label": "结构守护",
+      "desc": "check-structure.js 校验语法、banner 顺序、DOM id、常量区/尾部区、App 与 Weave.* 条目。方法体修改后用 --snapshot 重生成 golden.json 基线。",
+      "x": 145,
       "y": 9,
       "w": 10,
       "h": 6,
@@ -264,72 +360,114 @@
     },
     {
       "id": "c_g_5",
+      "from": "doc1_p3",
+      "to": "doc1_p4",
+      "label": "提交",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_6",
+      "from": "doc1_p4",
+      "to": "doc1_p5",
+      "label": "文档导读",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_7",
       "from": "root",
       "to": "doc2",
       "label": "编写文档或注释前阅读",
       "mirrored": false
     },
     {
-      "id": "c_g_6",
+      "id": "c_g_8",
       "from": "doc2",
       "to": "doc2_p1",
       "label": "禁止事项",
       "mirrored": false
     },
     {
-      "id": "c_g_7",
+      "id": "c_g_9",
       "from": "doc2_p1",
       "to": "doc2_p2",
       "label": "不推荐用词",
       "mirrored": false
     },
     {
-      "id": "c_g_8",
+      "id": "c_g_10",
       "from": "doc2_p2",
       "to": "doc2_p3",
       "label": "不推荐句式",
       "mirrored": false
     },
     {
-      "id": "c_g_9",
+      "id": "c_g_11",
       "from": "doc2_p3",
       "to": "doc2_p4",
       "label": "要求",
       "mirrored": false
     },
     {
-      "id": "c_g_10",
+      "id": "c_g_12",
       "from": "root",
       "to": "doc3",
       "label": "了解代码结构时阅读",
       "mirrored": false
     },
     {
-      "id": "c_g_11",
+      "id": "c_g_13",
       "from": "doc3",
       "to": "doc3_p1",
       "label": "存在形式",
       "mirrored": false
     },
     {
-      "id": "c_g_12",
+      "id": "c_g_14",
       "from": "doc3_p1",
       "to": "doc3_p2",
+      "label": "技术栈",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_15",
+      "from": "doc3_p2",
+      "to": "doc3_p3",
+      "label": "界面语言",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_16",
+      "from": "doc3_p3",
+      "to": "doc3_p4",
       "label": "数据模型",
       "mirrored": false
     },
     {
-      "id": "c_g_13",
-      "from": "doc3_p2",
-      "to": "doc3_p3",
+      "id": "c_g_17",
+      "from": "doc3_p4",
+      "to": "doc3_p5",
+      "label": "渲染结构",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_18",
+      "from": "doc3_p5",
+      "to": "doc3_p6",
       "label": "模块划分",
       "mirrored": false
     },
     {
-      "id": "c_g_14",
-      "from": "doc3_p3",
-      "to": "doc3_p4",
+      "id": "c_g_19",
+      "from": "doc3_p6",
+      "to": "doc3_p7",
       "label": "代码规则",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_20",
+      "from": "doc3_p7",
+      "to": "doc3_p8",
+      "label": "结构守护",
       "mirrored": false
     }
   ],
