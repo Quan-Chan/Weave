@@ -201,6 +201,20 @@ const shot = async (page, name) => {
   console.log('English 界面:', JSON.stringify(enState));
   if (enState.addBtn !== '+ Node' || enState.lang !== 'en') throw new Error('语言切换未生效: ' + JSON.stringify(enState));
   if (enState.helpKey !== 'Double-click') throw new Error('帮助键位框未翻译: ' + enState.helpKey);
+  const enDynamic = await page.evaluate(() => {
+    App._buildModalDots('blue');
+    return {
+      htmlLang: document.documentElement.lang,
+      empty: document.querySelector('.node-val .node-empty')?.textContent.trim(),
+      wheelTitle: document.querySelector('#mColors .m-wheel-btn')?.title,
+      dotTitle: document.querySelector('#mColors .m-dot')?.title
+    };
+  });
+  console.log('English 动态文案:', JSON.stringify(enDynamic));
+  if (enDynamic.htmlLang !== 'en' || enDynamic.empty !== 'Double-click to edit' ||
+      enDynamic.wheelTitle !== 'Custom color' || enDynamic.dotTitle !== 'Blue') {
+    throw new Error('English 动态文案未完整切换: ' + JSON.stringify(enDynamic));
+  }
   await shot(page, '09a_english_ui');
   const langZh = await page.evaluate(() => {
     const b = document.getElementById('btnLangZh').getBoundingClientRect();

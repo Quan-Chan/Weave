@@ -626,8 +626,8 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
               <div class="s-desc" data-i18n="set.languageDesc">界面显示语言</div>
             </div>
             <div class="lang-btns" id="langBtns">
-              <button class="lang-btn" id="btnLangZh">中文</button>
-              <button class="lang-btn" id="btnLangEn">English</button>
+              <button class="lang-btn" id="btnLangZh" data-lang="zh">中文</button>
+              <button class="lang-btn" id="btnLangEn" data-lang="en">English</button>
             </div>
           </div>
         </div>
@@ -662,7 +662,7 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.3</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.3.1</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -839,8 +839,9 @@ const connKeyOf = (from, to) => from + '|' + to;
 // 平台检测：键位显示与默认修饰键按平台（Mac → Cmd，其余 → Ctrl）。
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
 
-// ── 界面语言词典（zh/en 双语；切换入口在设置弹窗，见 M11）──
+// ── 界面语言词典（以语言代码为键：zh/en/…；切换入口在设置弹窗，见 M11）──
 // 键 = 语义键；t(key, params) 负责取值与 {占位符} 替换（见 M02 基础设施）。
+// 每种语言的键集须与 zh（源语言）完全一致，由 test/i18n-keys 检查。
 const I18N = {
   zh: {
     // 顶栏 / 侧边栏
@@ -856,6 +857,7 @@ const I18N = {
     'ctx.resize': '调整节点大小', 'ctx.curve': '调整连线曲线', 'ctx.resetCurve': '重置曲线控制点',
     'ctx.resetSize': '重置节点大小', 'ctx.del': '删除',
     'ctx.regionMove': '移动分区框', 'ctx.regionResize': '调整分区框大小',
+    'ctx.editLabel': '编辑文字', 'ctx.editDesc': '编辑描述',
     // 节点详情弹窗
     'modal.editTitle': '编辑节点', 'modal.label': '标签', 'modal.desc': '描述', 'modal.color': '颜色',
     'modal.regionTitle': '编辑分区', 'modal.regionLabel': '分区名称', 'modal.regionColor': '分区颜色',
@@ -921,6 +923,10 @@ const I18N = {
     'misc.newNode': '新节点', 'misc.region': '分区', 'misc.statusBadge': '{nodes} 节点 · {conns} 连线',
     'misc.color.blue': '蓝色', 'misc.color.cyan': '青色', 'misc.color.green': '绿色',
     'misc.color.yellow': '黄色', 'misc.color.orange': '橙色',
+    'misc.untitled': '未命名', 'misc.dblClickEdit': '双击编辑',
+    'misc.copySuffix': '{label} 副本',
+    // 确认框
+    'confirm.clearAll': '将清空页面节点信息，是否继续？',
     // Σ 彩蛋（startEasterEgg）
     'egg.hint': '点我试试', 'egg.toast': 'Σ 吐出了一个节点！', 'egg.desc': '由 Σ 吐出的节点'
   },
@@ -937,6 +943,7 @@ const I18N = {
     'ctx.resize': 'Resize node', 'ctx.curve': 'Adjust curve', 'ctx.resetCurve': 'Reset control points',
     'ctx.resetSize': 'Reset size', 'ctx.del': 'Delete',
     'ctx.regionMove': 'Move region frame', 'ctx.regionResize': 'Resize region frame',
+    'ctx.editLabel': 'Edit label', 'ctx.editDesc': 'Edit description',
     'modal.editTitle': 'Edit node', 'modal.label': 'Label', 'modal.desc': 'Description', 'modal.color': 'Color',
     'modal.regionTitle': 'Edit region', 'modal.regionLabel': 'Region name', 'modal.regionColor': 'Region color',
     'modal.cancel': 'Cancel', 'modal.save': 'Save', 'modal.customColor': 'Custom color', 'modal.confirm': 'OK',
@@ -998,6 +1005,9 @@ const I18N = {
     'misc.newNode': 'New node', 'misc.region': 'Region', 'misc.statusBadge': '{nodes} nodes · {conns} connections',
     'misc.color.blue': 'Blue', 'misc.color.cyan': 'Cyan', 'misc.color.green': 'Green',
     'misc.color.yellow': 'Yellow', 'misc.color.orange': 'Orange',
+    'misc.untitled': 'Untitled', 'misc.dblClickEdit': 'Double-click to edit',
+    'misc.copySuffix': '{label} copy',
+    'confirm.clearAll': 'This will clear all nodes, connections and regions. Continue?',
     'egg.hint': 'Click me', 'egg.toast': 'Σ spit out a node!', 'egg.desc': 'A node spat out by Σ'
   }
 };
@@ -1657,7 +1667,7 @@ const App = window.App = {
   _lastAddCenterX: null,
   _lastAddCenterY: null,
   _addCounter: 0,
-  //界面语言（'zh' | 'en'），见设置弹窗；持久化键 'lang'。
+  //界面语言（I18N 的语言代码，当前 zh/en），见设置弹窗；持久化键 'lang'。
   _lang: 'zh',
   //可自定义快捷键表（action → 组合键描述），见 _loadKeybinds / 设置弹窗。
   _keybinds: null,
@@ -1809,9 +1819,11 @@ Object.assign(App, {
   //行为）。关闭时，吸附到整像素——最小粒度为
   //1px，即序列化网格坐标系中一个网格单位的 1/20。
   _snap(v, useGrid) { if (useGrid === undefined) useGrid = this._snapNodes; return useGrid ? Math.round(v / GRID) * GRID : Math.round(v); },
-  //界面翻译：按当前语言取词典值，支持 {占位符} 替换；缺失时回退中文、再回退键名。
+  //界面翻译：按当前语言取词典值，支持 {占位符} 替换；
+  //缺键回退链 = 当前语言 → 英语 → 中文（源语言）→ 键名本身。
   t(key, params) {
     let s = (I18N[this._lang] || I18N.zh)[key];
+    if (s === undefined && this._lang !== 'en') s = I18N.en[key];
     if (s === undefined) s = I18N.zh[key];
     if (s === undefined) s = key;
     if (params) {
@@ -1821,33 +1833,31 @@ Object.assign(App, {
     }
     return s;
   },
-  //重刷全部 data-i18n / data-i18n-title / data-i18n-value 静态文本（切语言时调用）。
+  //重刷全部 data-i18n / data-i18n-title / data-i18n-value 静态文本（切语言时调用），
+  //并同步 <html lang>（屏幕阅读器发音与浏览器断行规则随之切换）。
   _applyLangUI() {
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = this.t(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-title]').forEach(el => { el.setAttribute('title', this.t(el.getAttribute('data-i18n-title'))); });
     document.querySelectorAll('[data-i18n-value]').forEach(el => { el.value = this.t(el.getAttribute('data-i18n-value')); });
+    document.documentElement.lang = this._lang === 'zh' ? 'zh-CN' : this._lang;
     //生成色按钮：文本与子元素（色点 span）并存，只更新文本节点。
     const gh = document.getElementById('genColorTrigger');
     if (gh && gh.childNodes[0]) gh.childNodes[0].textContent = this.t('btn.color');
   },
-  //切换界面语言（'zh' | 'en'），持久化到 localStorage 并即时刷新界面。
+  //切换界面语言（须为 I18N 中存在的语言代码），持久化到 localStorage 并即时刷新界面。
   setLang(lang) {
-    this._lang = lang === 'en' ? 'en' : 'zh';
+    this._lang = I18N[lang] ? lang : 'zh';
     this._settings.set('lang', this._lang);
     this._applyLangUI();
     this._updateLangButtons();
     this._updateStatusBadge();
     this.renderCanvas();
   },
-  //语言按钮点击入口（BIND_CLICKS 映射）。
-  setLangZh() { this.setLang('zh'); },
-  setLangEn() { this.setLang('en'); },
-  //语言按钮高亮（设置弹窗内）。
+  //语言按钮高亮（设置弹窗内）：按 data-lang 逐个比对当前语言，新增语言无需改此处。
   _updateLangButtons() {
-    const zhBtn = document.getElementById('btnLangZh');
-    const enBtn = document.getElementById('btnLangEn');
-    if (zhBtn) zhBtn.classList.toggle('active', this._lang !== 'en');
-    if (enBtn) enBtn.classList.toggle('active', this._lang === 'en');
+    document.querySelectorAll('.lang-btn[data-lang]').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-lang') === this._lang);
+    });
   }
 });
 
@@ -2189,7 +2199,7 @@ Object.assign(App, {
       nodeIds.add(n.id);
       if (typeof n.x !== 'number' || isNaN(n.x)) n.x = WORLD_CENTER_X + ((i % 4) - 1) * 300;
       if (typeof n.y !== 'number' || isNaN(n.y)) n.y = START_Y;
-      if (!n.label || typeof n.label !== 'string') n.label = '未命名';
+      if (!n.label || typeof n.label !== 'string') n.label = this.t('misc.untitled');
       //所有节点都是统一的：始终具有尺寸且可调整大小。
       if (typeof n.w !== 'number' || !isFinite(n.w)) n.w = NODE_DEFAULT_W; else if (n.w < NODE_MIN_W) n.w = NODE_MIN_W;
       if (typeof n.h !== 'number' || !isFinite(n.h)) n.h = NODE_DEFAULT_H; else if (n.h < NODE_MIN_H) n.h = NODE_MIN_H;
@@ -2475,7 +2485,8 @@ Object.assign(App, {
   //共享的圆点按钮 HTML：针对给定前缀的 5 种预设色 + 自定义色。
   _dotsHtml(active, prefix) {
     const mk = (c, bg) => {
-      return '<button class="' + prefix + '-dot' + (active === c ? ' active' : '') + '" data-c="' + c + '" style="background:' + bg + '" title="' + c + '"></button>';
+      const label = COLORS.includes(c) ? this.t('misc.color.' + c) : c;
+      return '<button class="' + prefix + '-dot' + (active === c ? ' active' : '') + '" data-c="' + c + '" style="background:' + bg + '" title="' + Weave.Util.escapeHtml(label) + '"></button>';
     };
     return COLORS.map(c => mk(c, COLOR_HEX[c])).join('') + this._customColors.map(c => mk(c, c)).join('');
   },
@@ -2492,6 +2503,8 @@ Object.assign(App, {
     let html = this._dotsHtml(active, prefix);
     if (extraHtml) html += extraHtml;
     cp.innerHTML = html;
+    const wheel = cp.querySelector('[data-c="__wheel__"]');
+    if (wheel) wheel.title = this.t('btn.colorWheel');
     cp.querySelectorAll('button').forEach(b => {
       b.addEventListener('click', () => onPick(b));
     });
@@ -2504,7 +2517,7 @@ Object.assign(App, {
       }
       document.getElementById('modal').dataset.color = b.dataset.c;
       this._renderModalDots(b.dataset.c);
-    }, '<button class="m-wheel-btn" data-c="__wheel__" title="\u81EA\u9009\u989C\u8272"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>');
+    }, '<button class="m-wheel-btn" data-c="__wheel__"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>');
   },
 
   // ── 色轮渲染 ── 
@@ -3179,11 +3192,11 @@ Object.assign(App, {
     nodeEl._hdr.className = 'node-header' + (isPreset ? ' h-' + rc.cls : '');
     nodeEl._hdr.style.background = isPreset ? '' : 'linear-gradient(135deg,' + rc.hex + ',' + rc.shadeHex + ')';
     nodeEl._hdr.style.textShadow = isPreset ? '' : '0 1px 3px rgba(0,0,0,.35)';
-    nodeEl._hdr.textContent = node.label || '未命名';
+    nodeEl._hdr.textContent = node.label || this.t('misc.untitled');
 
     nodeEl._val.innerHTML = node.desc
       ? Weave.Util.escapeHtml(node.desc)
-      : '<span class="node-empty">双击编辑</span>';
+      : '<span class="node-empty">' + Weave.Util.escapeHtml(this.t('misc.dblClickEdit')) + '</span>';
 
     const sckCls = 'socket ' + (isPreset ? 's-' + rc.cls + ' ' : '');
     nodeEl._sckIn.className = sckCls + 'in';
@@ -4879,7 +4892,7 @@ Object.assign(App, {
         const body = val.closest('.node-body');
         if (!body || !body.classList.contains('has-overflow') || val.isContentEditable) return;
         const text = val.textContent || '';
-        if (!text || text === '\u53CC\u51FB\u7F16\u8F91') return;
+        if (!text || val.querySelector('.node-empty')) return;
         clearTimeout(_tipTimer);
         _tipTimer = setTimeout(() => {
           _tip.textContent = text;
@@ -5510,7 +5523,7 @@ Object.assign(App, {
 
   clearAllNodes() {
     if (this.readOnly || (this.canvasState.nodes.length === 0 && this.canvasState.regions.length === 0)) return;
-    if (!confirm('将清空页面节点信息，是否继续？')) return;
+    if (!confirm(this.t('confirm.clearAll'))) return;
     this.canvasState.nodes = [];
     this.canvasState.connections = [];
     this.canvasState.regions = [];
@@ -5890,7 +5903,7 @@ Object.assign(App, {
       document.getElementById('regionModal').dataset.color = b.dataset.c;
       const cp = document.getElementById('rmColors');
       if (cp) this._setActiveDot(cp, b.dataset.c);
-    }, '<button class="m-wheel-btn" data-c="__wheel__" title="\u81EA\u9009\u989C\u8272"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>');
+    }, '<button class="m-wheel-btn" data-c="__wheel__"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>');
   },
 
   //删除分区：仅删除框本身，框内节点/连线保留（几何归属随框消失解除）。
@@ -5997,7 +6010,7 @@ Object.assign(App, {
   },
   _cloneNode(src, offsetX, offsetY) {
     const id = this._genId();
-    const c = { id, label: src.label + ' 副本', desc: src.desc, color: src.color,
+    const c = { id, label: this.t('misc.copySuffix', { label: src.label || this.t('misc.untitled') }), desc: src.desc, color: src.color,
       x: (src.x || 0) + (offsetX || 30), y: (src.y || 0) + (offsetY || 30),
       mirrored: !!src.mirrored };
     const size = Weave.Geom.getNodeSize(src); c.w = size.w; c.h = size.h;
@@ -6711,7 +6724,7 @@ Object.assign(App, {
     set('ctxSepRegion', isRegion);
 
     const ctxEdit = this._getEl('ctxEdit');
-    if (ctxEdit) ctxEdit.textContent = isConn ? '编辑文字' : (editTarget === 'desc' ? '编辑描述' : '编辑');
+    if (ctxEdit) ctxEdit.textContent = this.t(isConn ? 'ctx.editLabel' : (editTarget === 'desc' ? 'ctx.editDesc' : 'ctx.edit'));
     const m = this._getEl('ctx');
     m.style.left = Math.max(0, Math.min(x, innerWidth - 110)) + 'px';
     m.style.top = Math.max(0, Math.min(y, innerHeight - 100)) + 'px';
@@ -7409,7 +7422,7 @@ Object.assign(App, {
       ctx.fillStyle = grad; ctx.fill();
       ctx.fillStyle = '#fff'; ctx.font = '500 12px Inter, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1; ctx.shadowOffsetX = 0;
-      ctx.fillText(n.label || '\u672A\u547D\u540D', nx + 14, ny + 17, nw - 28);
+      ctx.fillText(n.label || this.t('misc.untitled'), nx + 14, ny + 17, nw - 28);
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.shadowOffsetX = 0;
       const socketR = 8, socketInnerR = 4;
       const outP = Weave.Geom.getSocketAnchor(n, 'out'), inP = Weave.Geom.getSocketAnchor(n, 'in');
@@ -7460,7 +7473,7 @@ Object.assign(App, {
         }
       } else {
         ctx.font = 'italic 10px Inter, sans-serif'; ctx.fillStyle = '#718096';
-        ctx.fillText('\u53CC\u51FB\u7F16\u8F91', nx + 14, bodyCenter, 110);
+        ctx.fillText(this.t('misc.dblClickEdit'), nx + 14, bodyCenter, 110);
       }
     });
     this._triggerDownload(canvas.toDataURL('image/png'), 'flow.png');
@@ -7647,8 +7660,9 @@ document.addEventListener('keydown', function(e) {
 //── 初始化 ──
 (function() {
   App._autoOpenModal = App._settings.getBool('autoModal');
-  //界面语言初始化（持久化键 'lang'），随后刷新全部静态文本与语言按钮高亮。
-  App._lang = App._settings.get('lang') === 'en' ? 'en' : 'zh';
+  //界面语言初始化（持久化键 'lang'，值须存在于 I18N，否则回退中文），随后刷新全部静态文本与语言按钮高亮。
+  const _savedLang = App._settings.get('lang');
+  App._lang = I18N[_savedLang] ? _savedLang : 'zh';
   App._applyLangUI();
   App._updateLangButtons();
   App._updateStatusBadge();
@@ -7714,13 +7728,17 @@ document.addEventListener('keydown', function(e) {
     btnCloseRegionModal: 'closeRegionModal', btnSaveRegionModal: 'saveRegionModal',
     btnCloseRegionModal: 'closeRegionModal', btnSaveRegionModal: 'saveRegionModal',
     btnCancelPicker: 'cancelCustomPicker', btnConfirmColor: 'confirmCustomColor',
-    btnLangZh: 'setLangZh', btnLangEn: 'setLangEn',
     btnResetKeybinds: '_resetKeybinds',
     btnResetSnap: '_resetSnapSettings'
   };
   for (const id of Object.keys(BIND_CLICKS)) {
     document.getElementById(id).addEventListener('click', () => App[BIND_CLICKS[id]]());
   }
+
+  /* 语言按钮：凡带 data-lang 的按钮一律绑定到 setLang（新增语言 = 加一个按钮） */
+  document.querySelectorAll('.lang-btn[data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => App.setLang(btn.getAttribute('data-lang')));
+  });
 
   /* Σ 彩蛋：键盘可达性（Enter/Space 触发） */
   const brandSigma = document.getElementById('brandSigma');

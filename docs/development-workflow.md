@@ -32,6 +32,7 @@
 |---|---|
 | 纯函数修改（Weave.*） | cd test && npm run test:fast |
 | 版本号修改 | cd test && npm run test:version |
+| I18N 文案或语言逻辑修改 | cd test && npm run test:i18n |
 | 任意代码修改后，结构守护 | cd test && npm run test:structure |
 | Weave.html 修改，GUI 冒烟 | cd test && npm run test:gui |
 | 收起功能 | cd test && npm run test:collapse |
@@ -56,8 +57,9 @@ npm scripts 与测试文件的对应关系：
 - test:dragsnap = node-drag-snap-test.js
 - test:undo = undo-cap-test.js
 - test:repro = repro-bugs.js
-- test:fast = check-version.js + geom-unit-test.js + check-structure.js
+- test:fast = check-version.js + geom-unit-test.js + i18n-keys.js + check-structure.js
 - test:version = check-version.js
+- test:i18n = i18n-keys.js
 
 单独运行单个测试文件：在仓库根目录执行 node test/文件名.js。测试台架与测试清单见 ../test/README.md。
 

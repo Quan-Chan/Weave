@@ -75,6 +75,7 @@ hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 | 文件 | 层级 | 职责 | 何时跑 |
 |---|---|---|---|
 | check-version.js | 静态 | 版本号一致性(应用/CHANGELOG/git tag) | 发版或改版本号后 |
+| i18n-keys.js | 静态 | I18N 键集、占位符、英文词典与静态引用 | 每次改语言文案或 Weave.html 后 |
 | check-structure.js | 静态 | 模块化结构守护(M01→M13/条目等价) | 每次改 Weave.html 后 |
 | geom-unit-test.js | 单测 | collapse 闭包/多父冲突纯函数 | 每次改 collapse 逻辑 |
 | gui-smoke.js | 冒烟 | 核心交互主路径(建节点/连线/设置/i18n) | 每次改 Weave.html 后 |
@@ -95,7 +96,7 @@ hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 | build-min.js | 工具 | 生成 Weave.min.html(**非测试**) | 发布时 |
 
 > 命名规范: `{功能}-{层级}-test.js`。`*-smoke.js`(gui/region/hl)、`check-structure.js`、
-> `repro-bugs.js` 为规范确定前的历史命名,保持不改。
+> `i18n-keys.js`、`repro-bugs.js` 为规范确定前的历史命名,保持不改。
 
 ### 压测存档与工具(非测试)
 
@@ -170,7 +171,7 @@ node test/check-structure.js              # 校验（无参数）
 - DOM id 集合与 golden 一致（104 个）
 - 常量区 / 尾部区（注释与空白归一化后）逐字一致
 - **App 条目逐条等价** —— 每个方法/状态字段的"名称 + 类型 + 归一化函数体"与 golden 逐一比对
-  （349 条 = 252 方法 + 97 状态字段）
+  （347 条 = 250 方法 + 97 状态字段）
 - `Weave.*` 命名空间成员逐条等价（41 个）
 
 golden.json 的 `movedOut` / `renames` 记录 Phase 2 从 App 提取到 `Weave.Util/Color/Geom`
