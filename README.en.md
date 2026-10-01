@@ -54,9 +54,9 @@ The full-mesh graph (250 nodes, 62,250 connections) is too large to bundle. Doub
 
 <hr>
 
-## Recovery tool
+<h2>Recovery tool</h2>
 
-To clear the graph or change saved settings, close all Weave pages and open the recovery page:
+If the app fails to start because of abnormal saved data, close all Weave pages and open the recovery page to repair it:
 
 | Scenario | Recovery page |
 | --- | --- |
