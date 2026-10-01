@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'">
+<title>Weave 恢复与设置</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#17202a;--muted:#667085;--line:#dfe3e8;--blue:#2563eb;--blue-hover:#1d4ed8;--red:#b42318;--red-hover:#912018;--green:#067647;--green-bg:#ecfdf3;--amber-bg:#fffaeb;--amber-line:#fedf89;--amber-text:#93370d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+.page{max-width:1180px;margin:0 auto;padding:36px 24px 64px}
+h1{font-size:26px;line-height:1.25;margin:0 0 8px}h2{font-size:18px;margin:0 0 6px}
+.lead{margin:0 0 24px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin:0 0 18px;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+.notice{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber-text);border-radius:10px;padding:12px 14px;margin:0 0 18px}
+.source{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:6px}
+.bucket-note{color:var(--muted);font-size:13px;margin-top:8px;line-height:1.55}
+.storage{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.size{border:1px solid var(--line);border-radius:9px;padding:12px;background:#fcfcfd}
+.size strong{display:block;font-size:20px;line-height:1.2;margin-bottom:3px}.size span{color:var(--muted);font-size:13px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.workspace{display:grid;grid-template-columns:400px minmax(0,1fr);gap:18px;align-items:start;margin-top:18px}
+.column{min-width:0}
+.left-column{position:sticky;top:24px}
+.column>.card:last-child{margin-bottom:0}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px}
+.settings-grid .setting{border-bottom:1px solid var(--line)}
+.settings-grid .setting:last-child{border-bottom:0;grid-column:1/-1}
+.io-actions>button,.io-actions>.file-button{flex:1}
+button,.file-button{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer;min-height:40px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+button:hover,.file-button:hover{background:#f9fafb;border-color:#b8c0cc}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff}button.primary:hover{background:var(--blue-hover)}
+button.danger{background:var(--red);border-color:var(--red);color:#fff;font-weight:650}button.danger:hover{background:var(--red-hover)}
+button.wide{width:100%;font-size:16px;min-height:48px}
+button.small{min-height:34px;padding:6px 10px;font-size:13px}
+.file-button{background:#fff}
+.hint{color:var(--muted);font-size:13px;margin:10px 0 0}
+.status{display:none;margin-top:14px;border-radius:8px;padding:10px 12px;white-space:pre-wrap}.status.show{display:block}.status.ok{background:var(--green-bg);color:var(--green)}.status.err{background:#fef3f2;color:var(--red)}.status.info{background:#eff8ff;color:#175cd3}
+.alert{display:none;background:#fef3f2;border:1px solid #fda29b;color:var(--red);border-radius:9px;padding:11px 13px;margin:0 0 18px;white-space:pre-wrap}.alert.show{display:block}
+.setting{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--line)}
+.setting:last-child{border-bottom:0}.setting-copy{min-width:0}.setting-title{font-weight:650}.setting-desc{color:var(--muted);font-size:13px;margin-top:2px}
+.switch{position:relative;flex:0 0 auto;width:44px;height:25px}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;z-index:2;cursor:pointer}
+.track{position:absolute;inset:0;background:#cfd4dc;border-radius:999px;transition:.15s}.thumb{position:absolute;top:3px;left:3px;width:19px;height:19px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch input:checked+.track{background:var(--blue)}.switch input:checked+.track+.thumb{transform:translateX(19px)}
+.langs{display:flex;gap:8px;min-width:0}.langs button{padding:8px 9px;min-width:0;white-space:nowrap}.langs button.active{background:#eff8ff;border-color:#84caff;color:#175cd3}
+input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;width:100%;max-width:190px;min-width:96px;background:#fff}
+.value-state{color:var(--muted);font-size:13px}
+.keybind-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px}
+.keybind-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.keybind-row:nth-last-child(-n+2){border-bottom:0}
+.key-capture{min-width:112px;font-family:Consolas,"SFMono-Regular",monospace;justify-content:center}
+.key-capture.recording{border-color:var(--blue);background:#eff8ff;color:#175cd3}
+.footer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+@media(max-width:960px){.page{max-width:760px}.workspace{grid-template-columns:1fr}.settings-grid,.keybind-grid{grid-template-columns:1fr}.keybind-row:nth-last-child(2){border-bottom:1px solid var(--line)}.left-column{position:static}}
+@media(max-width:620px){.page{padding:24px 12px 48px}.card{padding:16px}.storage{grid-template-columns:repeat(3,1fr);gap:6px}.size{padding:8px}.size strong{font-size:15px;white-space:nowrap}.size span{font-size:12px}.setting{align-items:flex-start}.actions button,.actions .file-button{flex:1 1 100%}input[type=text]{width:100%}}
+</style>
+</head>
+<body>
+<main class="page">
+  <h1 data-i18n="page.title">Weave 恢复与设置</h1>
+  <p class="lead" data-i18n="page.lead">显示本地数据占用，调整 Weave 设置，清空节点图。</p>
+
+  <div class="notice" data-i18n="page.notice">执行清空、导入或键位修改前关闭全部 Weave 页面。未关闭的页面可能覆盖已保存的数据。</div>
+  <div id="pageAlert" class="alert"></div>
+
+  <section class="card">
+    <h2 data-i18n="storage.title">本地数据占用</h2>
+    <p class="hint" data-i18n="storage.hint">显示已保存数据的字符数，按千进制换算为 B、KB、MB。本页不解析已保存的节点图数据。</p>
+    <div class="storage">
+      <div class="size"><strong id="graphSize">—</strong><span data-i18n="storage.graph">节点图数据</span></div>
+      <div class="size"><strong id="settingsSize">—</strong><span data-i18n="storage.settings">软件设置</span></div>
+      <div class="size"><strong id="totalSize">—</strong><span data-i18n="storage.total">数据合计</span></div>
+    </div>
+    <div class="actions"><button id="btnRefresh" type="button" data-i18n="storage.refresh">刷新大小</button><a class="file-button" id="openWeave" href="Weave.html" data-i18n="storage.openWeave">打开 Weave</a></div>
+    <div id="sourceInfo" class="source"></div>
+    <div id="bucketNote" class="bucket-note" data-i18n="storage.bucketNote">本页只显示并修改上面这一份数据。本地文件与在线站点各存一份，浏览器不允许跨来源读写。</div>
+    <div id="storageStatus" class="status"></div>
+  </section>
+
+  <div class="workspace">
+    <div class="column left-column">
+      <section class="card">
+        <h2 data-i18n="graph.title">节点图</h2>
+        <p class="hint" data-i18n="graph.hint">清空全部节点、连线和分区，保留软件设置。</p>
+        <div class="actions"><button id="btnClearGraph" class="danger wide" type="button" data-i18n="graph.clear">清空节点图</button></div>
+        <div id="graphStatus" class="status"></div>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="io.title">导入或导出节点图</h2>
+        <p class="hint" data-i18n="io.hint">导入文件将替换上面声明的那一份节点图。导出生成 JSON 备份。</p>
+        <div class="actions io-actions">
+          <label class="file-button" for="graphFile" data-i18n="io.import">导入节点图</label>
+          <input id="graphFile" type="file" accept=".json,application/json" hidden>
+          <button id="btnExportGraph" type="button" data-i18n="io.export">导出节点图</button>
+        </div>
+        <div id="ioStatus" class="status"></div>
+      </section>
+    </div>
+
+    <div class="column right-column">
+      <section class="card">
+        <h2 data-i18n="settings.title">软件设置</h2>
+        <p class="hint" data-i18n="settings.hint">开关和语言按钮修改后保存。新节点颜色在输入框失焦后保存。</p>
+
+        <div class="settings-grid">
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.snapNodes">对齐节点</div><div class="setting-desc" data-i18n="set.snapNodesDesc">节点位置对齐到网格；关闭后自由摆放</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_snap_nodes"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.snapSize">节点大小对齐</div><div class="setting-desc" data-i18n="set.snapSizeDesc">节点大小对齐到网格；关闭后自由调整</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_snap_size"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.snapRegionPos">分区位置对齐网格</div><div class="setting-desc" data-i18n="set.snapRegionPosDesc">分区框位置对齐到网格；关闭后自由摆放</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_snap_region_pos"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.snapRegionSize">分区大小对齐网格</div><div class="setting-desc" data-i18n="set.snapRegionSizeDesc">分区框大小对齐到网格；关闭后自由调整</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_snap_region_size"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.lang">语言</div><div class="setting-desc" data-i18n="set.langDesc">界面显示语言</div></div>
+            <div class="langs"><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">English</button></div>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.autoModal">新建自动打开详情</div><div class="setting-desc" data-i18n="set.autoModalDesc">新建节点后自动弹出详情窗口</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_auto_modal"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.hideUi">隐藏顶部与侧边界面</div><div class="setting-desc" data-i18n="set.hideUiDesc">下次打开 Weave 时进入专注模式</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_hide_ui"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.helpSeen">首次启动弹窗</div><div class="setting-desc" data-i18n="set.helpSeenDesc">开启后下次打开 Weave 不再自动弹出设置弹窗</div></div>
+            <label class="switch"><input type="checkbox" data-bool="flow_help_seen"><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.genColor">新节点颜色</div><div class="setting-desc" data-i18n="set.genColorDesc">新建节点使用的颜色。可填预设名称或 #RRGGBB</div></div>
+            <input id="genColor" type="text" list="presetColors" placeholder="blue">
+            <datalist id="presetColors"><option value="blue"><option value="cyan"><option value="green"><option value="yellow"><option value="orange"></datalist>
+          </div>
+          <div class="setting">
+            <div class="setting-copy"><div class="setting-title" data-i18n="set.customColors">自选颜色</div><div class="setting-desc" data-i18n="set.customColorsDesc">可清除已保存的自选颜色</div></div>
+            <button id="btnClearColors" class="small" type="button" data-i18n="set.clearColors">清除自选颜色</button>
+          </div>
+        </div>
+
+        <div class="footer-actions">
+          <button id="btnResetAlign" type="button" data-i18n="settings.resetAlign">重置对齐设置</button>
+          <button id="btnResetAll" type="button" data-i18n="settings.resetAll">重置全部设置</button>
+        </div>
+        <div id="settingsStatus" class="status"></div>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="keys.title">键位</h2>
+        <p class="hint" data-i18n="keys.hint">单击键位后按下组合键。修改在重新打开 Weave 后生效。</p>
+        <div class="keybind-grid">
+          <div class="keybind-row"><span data-kb-label="undo" data-i18n="key.undo">撤销</span><button class="key-capture" type="button" data-kb="undo">Ctrl+Z</button></div>
+          <div class="keybind-row"><span data-kb-label="redo" data-i18n="key.redo">重做</span><button class="key-capture" type="button" data-kb="redo">Ctrl+Y</button></div>
+          <div class="keybind-row"><span data-kb-label="selectAll" data-i18n="key.selectAll">全选</span><button class="key-capture" type="button" data-kb="selectAll">Ctrl+A</button></div>
+          <div class="keybind-row"><span data-kb-label="copy" data-i18n="key.copy">复制</span><button class="key-capture" type="button" data-kb="copy">Ctrl+C</button></div>
+          <div class="keybind-row"><span data-kb-label="paste" data-i18n="key.paste">粘贴</span><button class="key-capture" type="button" data-kb="paste">Ctrl+V</button></div>
+          <div class="keybind-row"><span data-kb-label="autoModal" data-i18n="key.autoModal">新建自动打开详情</span><button class="key-capture" type="button" data-kb="autoModal">Ctrl+E</button></div>
+          <div class="keybind-row"><span data-kb-label="chrome" data-i18n="key.chrome">隐藏 / 显示界面</span><button class="key-capture" type="button" data-kb="chrome">Ctrl+H</button></div>
+          <div class="keybind-row"><span data-kb-label="region" data-i18n="key.region">画分区</span><button class="key-capture" type="button" data-kb="region">Shift+R</button></div>
+          <div class="keybind-row"><span data-kb-label="hlNode" data-i18n="key.hlNode">高亮关联节点</span><button class="key-capture" type="button" data-kb="hlNode">Alt</button></div>
+          <div class="keybind-row"><span data-kb-label="delete" data-i18n="key.delete">删除选中</span><button class="key-capture" type="button" data-kb="delete">Delete</button></div>
+        </div>
+        <div class="footer-actions"><button id="btnResetKeys" type="button" data-i18n="keys.reset">重置键位</button></div>
+        <div id="keybindStatus" class="status"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  'use strict';
+  var DATA_KEY='flow_data';
+  var BOOL_DEFAULTS={flow_snap_nodes:'1',flow_snap_size:'1',flow_snap_region_pos:'1',flow_snap_region_size:'1',flow_auto_modal:'0',flow_hide_ui:'0',flow_help_seen:'0'};
+  var KEYBIND_DEFAULTS={
+    undo:{anyMod:true,shift:false,alt:false,key:'z'},
+    redo:{anyMod:true,shift:false,alt:false,key:'y'},
+    selectAll:{anyMod:true,shift:false,alt:false,key:'a'},
+    copy:{anyMod:true,shift:false,alt:false,key:'c'},
+    paste:{anyMod:true,shift:false,alt:false,key:'v'},
+    autoModal:{anyMod:true,shift:false,alt:false,key:'e'},
+    chrome:{anyMod:true,shift:false,alt:false,key:'h'},
+    region:{anyMod:false,shift:true,alt:false,key:'r'},
+    delete:{anyMod:false,shift:false,alt:false,key:'delete'},
+    hlNode:{anyMod:false,ctrl:false,meta:false,alt:true,shift:false,key:'any'}
+  };
+  //动作 → 键位名称的翻译键；冲突提示与键位行标签都由此取文案。
+  var KEYBIND_ACTIONS=[['undo','key.undo'],['redo','key.redo'],['selectAll','key.selectAll'],['copy','key.copy'],['paste','key.paste'],['autoModal','key.autoModal'],['chrome','key.chrome'],['region','key.region'],['hlNode','key.hlNode'],['delete','key.delete']];
+  var SETTING_KEYS=Object.keys(BOOL_DEFAULTS).concat(['flow_gen_color','flow_lang','flow_keybinds','flow_custom_colors']);
+  var storageOK=false;
+  var keybinds=null;
+  var keybindEditing=null;
+  var keybindDataError=false;
+  var IS_MAC=/Mac|iPhone|iPad|iPod/.test(navigator.platform||navigator.userAgent);
+  //界面词典。语言代码与 localStorage 的 flow_lang 一致，因此本页与主程序共用同一个语言开关。
+  var I18N={
+    zh:{
+      'page.title':'Weave 恢复与设置','page.lead':'显示本地数据占用，调整 Weave 设置，清空节点图。',
+      'page.notice':'执行清空、导入或键位修改前关闭全部 Weave 页面。未关闭的页面可能覆盖已保存的数据。',
+      'storage.title':'本地数据占用','storage.hint':'显示已保存数据的字符数，按千进制换算为 B、KB、MB。本页不解析已保存的节点图数据。',
+      'storage.graph':'节点图数据','storage.settings':'软件设置','storage.total':'数据合计',
+      'storage.refresh':'刷新大小','storage.openWeave':'打开 Weave',
+      'storage.bucketNote':'本页只显示并修改上面这一份数据。本地文件与在线站点各存一份，浏览器不允许跨来源读写。',
+      'storage.saved':'已保存节点图数据。','storage.empty':'未保存节点图数据。Weave 启动时显示空白画布。',
+      'storage.readFailed':'读取本地数据大小失败：{msg}',
+      'storage.sourceFile':'当前查看：本地文件数据（file:）','storage.sourceSite':'当前查看：在线站点数据（{host}）',
+      'storage.unavailable':'无法访问 localStorage：{msg}',
+      'graph.title':'节点图','graph.hint':'清空全部节点、连线和分区，保留软件设置。','graph.clear':'清空节点图',
+      'graph.cleared':'节点图数据已清空。重新打开 Weave 后显示空白画布。','graph.clearFailed':'清空失败：{msg}',
+      'graph.confirm':'将清空全部节点、连线和分区，并释放节点图数据占用。\n软件设置会保留。\n\n确定继续吗？',
+      'graph.rewritten':'节点图数据被其他页面重新写入。\n关闭全部 Weave 页面后再次执行清空。',
+      'graph.modifiedElsewhere':'节点图数据被其他页面修改。\nWeave 页面关闭时可能写入内存中的节点图数据。',
+      'io.title':'导入或导出节点图','io.hint':'导入文件将替换上面声明的那一份节点图。导出生成 JSON 备份。',
+      'io.import':'导入节点图','io.export':'导出节点图',
+      'io.reading':'正在读取 {name}……','io.parseFailed':'导入失败：JSON 格式错误。',
+      'io.invalid':'导入失败：{reason}。当前节点图数据保持不变。',
+      'io.rejectTop':'顶层必须是 JSON 对象','io.rejectNodes':'nodes 必须是数组',
+      'io.rejectConns':'connections 必须是数组','io.rejectRegions':'regions 必须是数组',
+      'io.rejectViewport':'viewport 必须是对象',
+      'io.confirm':'将用 {name} 替换当前节点图。\n\n确定继续吗？','io.canceled':'已取消导入。',
+      'io.written':'节点图数据已写入。',
+      'io.writeFailed':'导入失败：{name} — {msg}\n当前节点图数据保持不变。',
+      'io.verifyFailed':'写入校验失败','io.readFileFailed':'文件读取失败：{msg}',
+      'io.keybindFormat':'键位数据格式错误','settings.opFailed':'操作失败：{msg}',
+      'io.nothing':'当前没有可导出的节点图。','io.downloaded':'已生成节点图 JSON 下载。',
+      'settings.title':'软件设置','settings.hint':'开关和语言按钮修改后保存。新节点颜色在输入框失焦后保存。',
+      'settings.saved':'设置已保存。','settings.saveFailed':'保存失败：{msg}',
+      'settings.resetAlign':'重置对齐设置','settings.resetAll':'重置全部设置',
+      'settings.langSaved':'语言设置已保存。','settings.colorSaved':'新节点颜色已保存。',
+      'settings.resetAlignDone':'对齐设置已重置为默认值。','settings.resetAllDone':'全部设置已重置为默认值。',
+      'settings.colorsCleared':'已清除自选颜色。','settings.resetFailed':'操作失败：{msg}',
+      'set.snapNodes':'对齐节点','set.snapNodesDesc':'节点位置对齐到网格；关闭后自由摆放',
+      'set.snapSize':'节点大小对齐','set.snapSizeDesc':'节点大小对齐到网格；关闭后自由调整',
+      'set.snapRegionPos':'分区位置对齐网格','set.snapRegionPosDesc':'分区框位置对齐到网格；关闭后自由摆放',
+      'set.snapRegionSize':'分区大小对齐网格','set.snapRegionSizeDesc':'分区框大小对齐到网格；关闭后自由调整',
+      'set.lang':'语言','set.langDesc':'界面显示语言',
+      'set.autoModal':'新建自动打开详情','set.autoModalDesc':'新建节点后自动弹出详情窗口',
+      'set.hideUi':'隐藏顶部与侧边界面','set.hideUiDesc':'下次打开 Weave 时进入专注模式',
+      'set.helpSeen':'首次启动弹窗','set.helpSeenDesc':'开启后下次打开 Weave 不再自动弹出设置弹窗',
+      'set.genColor':'新节点颜色','set.genColorDesc':'新建节点使用的颜色。可填预设名称或 #RRGGBB',
+      'set.customColors':'自选颜色','set.customColorsDesc':'可清除已保存的自选颜色',
+      'set.clearColors':'清除自选颜色',
+      'keys.title':'键位','keys.hint':'单击键位后按下组合键。修改在重新打开 Weave 后生效。','keys.reset':'重置键位',
+      'keys.recording':'正在录制键位。Enter 或 Escape 取消。','keys.canceled':'已取消键位录制。',
+      'keys.saved':'键位已保存。重新打开 Weave 后生效。','keys.resetDone':'键位已重置。重新打开 Weave 后生效。',
+      'keys.saveFailed':'键位保存失败：{msg}','keys.resetFailed':'键位重置失败：{msg}',
+      'keys.dup':'键位与“{name}”重复。','keys.parseFailed':'已保存的键位数据无法解析，当前显示内置键位。重置键位会清除该数据。',
+      'keys.needMainKey':'该动作需要主键。','keys.modifiedElsewhere':'键位数据被其他页面修改。',
+      'key.undo':'撤销','key.redo':'重做','key.selectAll':'全选','key.copy':'复制','key.paste':'粘贴',
+      'key.autoModal':'新建自动打开详情','key.chrome':'隐藏 / 显示界面','key.region':'画分区',
+      'key.hlNode':'高亮关联节点','key.delete':'删除选中',
+      'keys.confirmReset':'确定重置键位吗？节点图数据保持不变。',
+      'settings.confirmPrefix':'确定',
+      'settings.confirmSuffix':'吗？节点图数据保持不变。'
+    },
+    en:{
+      'page.title':'Weave Recovery & Settings','page.lead':'Review local data usage, adjust Weave settings, clear the graph.',
+      'page.notice':'Close all Weave pages before clearing, importing, or editing keybindings. Open pages may overwrite saved data.',
+      'storage.title':'Local data usage','storage.hint':'Character count of saved data, converted to B, KB, and MB with decimal units. This page does not parse the saved graph.',
+      'storage.graph':'Graph data','storage.settings':'Software settings','storage.total':'Total',
+      'storage.refresh':'Refresh sizes','storage.openWeave':'Open Weave',
+      'storage.bucketNote':'This page only displays and modifies the dataset named above. Local files and the online site each keep their own copy, and browsers do not allow cross-origin access.',
+      'storage.saved':'Saved graph data.','storage.empty':'No saved graph data. Weave opens a blank canvas.',
+      'storage.readFailed':'Failed to read local data size: {msg}',
+      'storage.sourceFile':'Now viewing: local file data (file:)','storage.sourceSite':'Now viewing: online site data ({host})',
+      'storage.unavailable':'Cannot access localStorage: {msg}',
+      'graph.title':'Graph','graph.hint':'Clear all nodes, connections, and regions. Software settings are kept.','graph.clear':'Clear graph',
+      'graph.cleared':'Graph data cleared. Reopening Weave shows a blank canvas.','graph.clearFailed':'Clear failed: {msg}',
+      'graph.confirm':'This clears all nodes, connections, and regions, and releases the graph data.\nSoftware settings are kept.\n\nContinue?',
+      'graph.rewritten':'Graph data was rewritten by another page.\nClose all Weave pages and clear again.',
+      'graph.modifiedElsewhere':'Graph data was modified by another page.\nA Weave page may write its in-memory graph when it closes.',
+      'io.title':'Import or export graph','io.hint':'An imported file replaces the dataset named above. Export creates a JSON backup.',
+      'io.import':'Import graph','io.export':'Export graph',
+      'io.reading':'Reading {name}...','io.parseFailed':'Import failed: invalid JSON.',
+      'io.invalid':'Import failed: {reason}. The current graph data is unchanged.',
+      'io.rejectTop':'the top level must be a JSON object','io.rejectNodes':'nodes must be an array',
+      'io.rejectConns':'connections must be an array','io.rejectRegions':'regions must be an array',
+      'io.rejectViewport':'viewport must be an object',
+      'io.confirm':'{name} will replace the current graph.\n\nContinue?','io.canceled':'Import canceled.',
+      'io.written':'Graph data written.',
+      'io.writeFailed':'Import failed: {name} - {msg}\nThe current graph data is unchanged.',
+      'io.verifyFailed':'write verification failed','io.readFileFailed':'Failed to read file: {msg}',
+      'io.keybindFormat':'keybinding data is malformed','settings.opFailed':'Operation failed: {msg}',
+      'io.nothing':'There is no graph to export.','io.downloaded':'Graph JSON download created.',
+      'settings.title':'Software settings','settings.hint':'Switches and language buttons save immediately. New node color saves on blur.',
+      'settings.saved':'Settings saved.','settings.saveFailed':'Save failed: {msg}',
+      'settings.resetAlign':'Reset alignment','settings.resetAll':'Reset all settings',
+      'settings.langSaved':'Language setting saved.','settings.colorSaved':'New node color saved.',
+      'settings.resetAlignDone':'Alignment settings reset to defaults.','settings.resetAllDone':'All settings reset to defaults.',
+      'settings.colorsCleared':'Custom colors cleared.','settings.resetFailed':'Operation failed: {msg}',
+      'set.snapNodes':'Snap nodes','set.snapNodesDesc':'Snap node positions to the grid; off allows free placement',
+      'set.snapSize':'Snap node size','set.snapSizeDesc':'Snap node sizes to the grid; off allows free resizing',
+      'set.snapRegionPos':'Snap region position','set.snapRegionPosDesc':'Snap region positions to the grid; off allows free placement',
+      'set.snapRegionSize':'Snap region size','set.snapRegionSizeDesc':'Snap region sizes to the grid; off allows free resizing',
+      'set.lang':'Language','set.langDesc':'Interface language',
+      'set.autoModal':'Auto-open node details','set.autoModalDesc':'Open the details window for each new node',
+      'set.hideUi':'Hide top and side interface','set.hideUiDesc':'Enter focus mode the next time Weave opens',
+      'set.helpSeen':'First-run modal','set.helpSeenDesc':'When on, Weave stops showing the settings modal on first run',
+      'set.genColor':'New node color','set.genColorDesc':'Color used for new nodes. Accepts a preset name or #RRGGBB',
+      'set.customColors':'Custom colors','set.customColorsDesc':'Clear the saved custom colors',
+      'set.clearColors':'Clear custom colors',
+      'keys.title':'Keybindings','keys.hint':'Click a keybinding, then press the combination. Changes apply after reopening Weave.','keys.reset':'Reset keybindings',
+      'keys.recording':'Recording a keybinding. Press Enter or Escape to cancel.','keys.canceled':'Keybinding recording canceled.',
+      'keys.saved':'Keybinding saved. Reopen Weave for it to take effect.','keys.resetDone':'Keybindings reset. Reopen Weave for them to take effect.',
+      'keys.saveFailed':'Failed to save keybinding: {msg}','keys.resetFailed':'Failed to reset keybindings: {msg}',
+      'keys.dup':'Duplicates "{name}".','keys.parseFailed':'The saved keybindings could not be parsed; built-in keybindings are shown. Resetting clears that data.',
+      'keys.needMainKey':'This action needs a main key.','keys.modifiedElsewhere':'Keybindings were modified by another page.',
+      'key.undo':'Undo','key.redo':'Redo','key.selectAll':'Select all','key.copy':'Copy','key.paste':'Paste',
+      'key.autoModal':'Auto-open node details','key.chrome':'Hide / show interface','key.region':'Draw region',
+      'key.hlNode':'Highlight related nodes','key.delete':'Delete selection',
+      'keys.confirmReset':'Reset keybindings? Node graph data is kept.',
+      'settings.confirmPrefix':'Confirm: ',
+      'settings.confirmSuffix':'? Node graph data is kept.'
+    }
+  };
+  var lang='zh';
+  function t(key,params){
+    var s=(I18N[lang]&&I18N[lang][key])||(I18N.zh[key])||key;
+    if(params)for(var k in params)s=s.split('{'+k+'}').join(params[k]);
+    return s;
+  }
+  //重刷全部 data-i18n 静态文本并同步 <html lang>（切语言时调用）。
+  function applyLang(){
+    document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'));});
+    document.documentElement.lang=lang==='zh'?'zh-CN':lang;
+  }
+  function $(id){return document.getElementById(id);}
+  function status(id,text,type){var e=$(id);e.textContent=text||'';e.className='status'+(text?' show '+(type||'info'):'');}
+  function pageAlert(text){var e=$('pageAlert');e.textContent=text||'';e.className='alert'+(text?' show':'');}
+  function sizeLabel(n){if(n===0)return'0 B';if(n<1000)return n+' B';if(n<1000000)return(n/1000).toFixed(1)+' KB';return(n/1000000).toFixed(2)+' MB';}
+  function readValue(key){try{return localStorage.getItem(key);}catch(e){return null;}}
+  function refreshSizes(){
+    if(!storageOK)return;
+    try{
+      var graph=localStorage.getItem(DATA_KEY);
+      var graphLen=graph?graph.length:0;
+      var settingsLen=0;
+      for(var i=0;i<localStorage.length;i++){
+        var key=localStorage.key(i);
+        if(!key||key.indexOf('flow_')!==0||key===DATA_KEY)continue;
+        var value=localStorage.getItem(key);
+        if(value!==null){settingsLen+=value.length;}
+      }
+      $('graphSize').textContent=sizeLabel(graphLen);
+      $('settingsSize').textContent=sizeLabel(settingsLen);
+      $('totalSize').textContent=sizeLabel(graphLen+settingsLen);
+      status('storageStatus',graph?t('storage.saved'):t('storage.empty'),'info');
+    }catch(e){status('storageStatus',t('storage.readFailed',{msg:e.message}),'err');}
+  }
+  function loadSettings(){
+    document.querySelectorAll('[data-bool]').forEach(function(input){
+      var key=input.getAttribute('data-bool');
+      var value=readValue(key);
+      input.checked=value===null?BOOL_DEFAULTS[key]==='1':value==='1';
+    });
+    document.querySelectorAll('[data-lang]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-lang')===lang);});
+    $('genColor').value=readValue('flow_gen_color')||'blue';
+  }
+  function cloneKeybindDefaults(){
+    return JSON.parse(JSON.stringify(KEYBIND_DEFAULTS));
+  }
+  function loadKeybinds(){
+    keybinds=cloneKeybindDefaults();
+    keybindDataError=false;
+    var saved=readValue('flow_keybinds');
+    if(!saved)return;
+    try{
+      var parsed=JSON.parse(saved);
+      if(parsed===null||typeof parsed!=='object'||Array.isArray(parsed))throw new Error(t('io.keybindFormat'));
+      KEYBIND_ACTIONS.forEach(function(item){
+        var action=item[0],value=parsed[action];
+        if(!value||typeof value!=='object'||!value.key)return;
+        if(action==='hlNode'||value.key!=='any')keybinds[action]=value;
+      });
+    }catch(e){keybindDataError=true;}
+  }
+  function keyNameLabel(key){
+    var names={backspace:'Backspace',delete:'Delete',enter:'Enter',escape:'Escape',tab:'Tab',arrowup:'ArrowUp',arrowdown:'ArrowDown',arrowleft:'ArrowLeft',arrowright:'ArrowRight',home:'Home',end:'End',pageup:'PageUp',pagedown:'PageDown'};
+    if(key===' ')return'Space';
+    if(names[key])return names[key];
+    if(/^f\d{1,2}$/.test(key))return key.toUpperCase();
+    return key.length===1?key.toUpperCase():key;
+  }
+  function keybindLabel(b){
+    if(!b)return'';
+    var parts=[];
+    if(b.anyMod)parts.push(IS_MAC?'Cmd':'Ctrl');
+    if(b.ctrl)parts.push('Ctrl');
+    if(b.meta)parts.push('Cmd');
+    if(b.alt)parts.push('Alt');
+    if(b.shift)parts.push('Shift');
+    if(b.key!=='any')parts.push(keyNameLabel(b.key));
+    return parts.join('+');
+  }
+  function ctrlRequirement(b){
+    if(b.anyMod)return 3;
+    return(b.ctrl?1:0)|(b.meta?2:0);
+  }
+  function sameKeybind(a,b){
+    if(!a||!b||a.key!==b.key)return false;
+    if(!!a.alt!==!!b.alt||!!a.shift!==!!b.shift)return false;
+    if(a.key==='any')return ctrlRequirement(a)===ctrlRequirement(b);
+    var aReq=ctrlRequirement(a),bReq=ctrlRequirement(b);
+    if(aReq===0&&bReq===0)return true;
+    return(aReq&bReq)!==0;
+  }
+  function findKeybindConflict(action,combo){
+    var conflict=null;
+    KEYBIND_ACTIONS.forEach(function(item){
+      if(!conflict&&item[0]!==action&&sameKeybind(keybinds[item[0]],combo))conflict=item;
+    });
+    return conflict;
+  }
+  function renderKeybinds(){
+    document.querySelectorAll('.key-capture').forEach(function(button){
+      var action=button.getAttribute('data-kb');
+      button.textContent=keybindLabel(keybinds[action]);
+      button.classList.remove('recording');
+    });
+    if(keybindDataError)status('keybindStatus',t('keys.parseFailed'),'err');
+  }
+  function stopKeybindCapture(){
+    if(!keybindEditing)return;
+    document.removeEventListener('keydown',keybindEditing.onKey,true);
+    document.removeEventListener('keyup',keybindEditing.onUp,true);
+    keybindEditing=null;
+  }
+  function cancelKeybindEdit(message){
+    if(keybindEditing){
+      var button=keybindEditing.button;
+      button.textContent=button.dataset.orig||'';
+      button.classList.remove('recording');
+      stopKeybindCapture();
+    }
+    if(message)status('keybindStatus',message,'info');
+  }
+  function finishKeybindEdit(action,combo){
+    var conflict=findKeybindConflict(action,combo);
+    if(conflict){cancelKeybindEdit(t('keys.dup',{name:t(conflict[1])}));return;}
+    var previous=keybinds[action];
+    keybinds[action]=combo;
+    try{
+      var raw=JSON.stringify(keybinds);
+      localStorage.setItem('flow_keybinds',raw);
+      if(localStorage.getItem('flow_keybinds')!==raw)throw new Error(t('io.verifyFailed'));
+      var button=document.querySelector('.key-capture[data-kb="'+action+'"]');
+      button.textContent=keybindLabel(combo);
+      button.classList.remove('recording');
+      stopKeybindCapture();
+      status('keybindStatus',t('keys.saved'),'ok');
+      refreshSizes();
+    }catch(e){
+      keybinds[action]=previous;
+      renderKeybinds();
+      cancelKeybindEdit(t('keys.saveFailed',{msg:e.message}));
+    }
+  }
+  function startKeybindEdit(action,button){
+    if(!keybinds)return;
+    if(keybindEditing)cancelKeybindEdit();
+    button.dataset.orig=keybindLabel(keybinds[action]);
+    button.classList.add('recording');
+    button.textContent='…';
+    var pendingMod=null;
+    var onKey=function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      var key=e.key.toLowerCase();
+      if(key==='enter'){cancelKeybindEdit(t('keys.canceled'));return;}
+      if(key==='escape'){cancelKeybindEdit(t('keys.canceled'));return;}
+      var isModOnly=key==='control'||key==='meta'||key==='shift'||key==='alt';
+      if(isModOnly){
+        var combo={ctrl:!!e.ctrlKey,meta:!!e.metaKey,alt:!!e.altKey,shift:!!e.shiftKey,key:''};
+        var count=(combo.ctrl?1:0)+(combo.meta?1:0)+(combo.alt?1:0)+(combo.shift?1:0);
+        if(count===1&&!pendingMod)pendingMod=combo;
+        return;
+      }
+      finishKeybindEdit(action,{ctrl:!!e.ctrlKey,meta:!!e.metaKey,alt:!!e.altKey,shift:!!e.shiftKey,key:key});
+    };
+    var onUp=function(e){
+      if(!pendingMod)return;
+      var key=e.key.toLowerCase();
+      var matched=(pendingMod.ctrl&&key==='control')||(pendingMod.meta&&key==='meta')||
+                  (pendingMod.alt&&key==='alt')||(pendingMod.shift&&key==='shift');
+      if(!matched)return;
+      var combo=pendingMod;
+      pendingMod=null;
+      if(action!=='hlNode'){cancelKeybindEdit(t('keys.needMainKey'));return;}
+      combo.key='any';
+      finishKeybindEdit(action,combo);
+    };
+    keybindEditing={action:action,button:button,onKey:onKey,onUp:onUp};
+    document.addEventListener('keydown',onKey,true);
+    document.addEventListener('keyup',onUp,true);
+    status('keybindStatus',t('keys.recording'),'info');
+  }
+  function resetKeybinds(){
+    if(!confirm(t('keys.confirmReset')))return;
+    cancelKeybindEdit();
+    try{
+      localStorage.setItem('flow_keybinds','');
+      keybinds=cloneKeybindDefaults();
+      keybindDataError=false;
+      renderKeybinds();
+      status('keybindStatus',t('keys.resetDone'),'ok');
+      refreshSizes();
+    }catch(e){status('keybindStatus',t('keys.resetFailed',{msg:e.message}),'err');}
+  }
+  function saveSetting(key,value,message){
+    try{localStorage.setItem(key,value);loadSettings();refreshSizes();status('settingsStatus',message||t('settings.saved'),'ok');}
+    catch(e){status('settingsStatus',t('settings.saveFailed',{msg:e.message}),'err');}
+  }
+  function clearGraph(){
+    if(!storageOK)return;
+    if(!confirm(t('graph.confirm')))return;
+    try{
+      localStorage.removeItem(DATA_KEY);
+      status('graphStatus',t('graph.cleared'),'ok');
+      refreshSizes();
+      scheduleCheck();
+    }catch(e){status('graphStatus',t('graph.clearFailed',{msg:e.message}),'err');}
+  }
+  function scheduleCheck(){
+    setTimeout(function(){
+      try{
+        var raw=localStorage.getItem(DATA_KEY);
+        if(raw){pageAlert(t('graph.rewritten'));refreshSizes();}
+      }catch(e){}
+    },1200);
+  }
+  function strictReject(data){
+    if(data===null||typeof data!=='object'||Array.isArray(data))return t('io.rejectTop');
+    if(!Array.isArray(data.nodes))return t('io.rejectNodes');
+    if(data.connections!==undefined&&!Array.isArray(data.connections))return t('io.rejectConns');
+    if(data.regions!==undefined&&!Array.isArray(data.regions))return t('io.rejectRegions');
+    if(data.viewport!==undefined&&data.viewport!==null&&(typeof data.viewport!=='object'||Array.isArray(data.viewport)))return t('io.rejectViewport');
+    return null;
+  }
+  function importGraph(file){
+    if(!file)return;
+    status('ioStatus',t('io.reading',{name:file.name}),'info');
+    file.text().then(function(text){
+      var data;
+      try{data=JSON.parse(text);}catch(e){status('ioStatus',t('io.parseFailed'),'err');return;}
+      var reject=strictReject(data);
+      if(reject){status('ioStatus',t('io.invalid',{reason:reject}),'err');return;}
+      if(!confirm(t('io.confirm',{name:file.name}))){status('ioStatus',t('io.canceled'),'info');return;}
+      var compact=JSON.stringify(data);
+      try{
+        localStorage.setItem(DATA_KEY,compact);
+        if(localStorage.getItem(DATA_KEY)!==compact)throw new Error(t('io.verifyFailed'));
+        status('ioStatus',t('io.written'),'ok');
+        refreshSizes();
+      }catch(e){status('ioStatus',t('io.writeFailed',{name:e.name||'Error',msg:e.message}),'err');}
+    }).catch(function(e){status('ioStatus',t('io.readFileFailed',{msg:e.message}),'err');});
+  }
+  function exportGraph(){
+    var raw=readValue(DATA_KEY);
+    if(raw===null){status('ioStatus',t('io.nothing'),'info');return;}
+    var blob=new Blob([raw],{type:'application/json;charset=utf-8'});
+    var url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='weave-recovery.json';a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    status('ioStatus',t('io.downloaded'),'ok');
+  }
+  //重置一组设置键。label 为提示语，doneText 为完成语，两者都随语言切换。
+  function resetKeys(keys,label,doneText){
+    if(!confirm(t('settings.confirmPrefix')+label+t('settings.confirmSuffix')))return;
+    try{
+      keys.forEach(function(k){
+        if(k==='flow_keybinds')localStorage.setItem(k,'');
+        else localStorage.removeItem(k);
+      });
+      cancelKeybindEdit();
+      loadKeybinds();
+      renderKeybinds();
+      loadSettings();
+      refreshSizes();
+      status('settingsStatus',doneText,'ok');
+    }
+    catch(e){status('settingsStatus',t('settings.opFailed',{msg:e.message}),'err');}
+  }
+  function init(){
+    //本页的全部操作只作用于当前来源对应的那一份数据。浏览器按来源隔离存储区，
+    //file: 与 http(s): 互不可见，页面无法跨来源读写，来源不同则声明文案不同。
+    var isFile=location.protocol==='file:';
+    //语言与主程序共用 flow_lang：在本页切换语言，主程序下次打开即为同一语言。
+    lang=I18N[readValue('flow_lang')]?readValue('flow_lang'):'zh';
+    applyLang();
+    $('sourceInfo').textContent=isFile
+      ?t('storage.sourceFile')
+      :t('storage.sourceSite',{host:location.host});
+    $('sourceInfo').title=location.href;
+    $('openWeave').href=isFile?'Weave.html':'./index.html';
+    try{
+      localStorage.setItem('__weave_recovery_probe__','1');localStorage.removeItem('__weave_recovery_probe__');
+      storageOK=true;
+    }catch(e){storageOK=false;pageAlert(t('storage.unavailable',{msg:e.message}));}
+    document.querySelectorAll('[data-bool]').forEach(function(input){
+      input.addEventListener('change',function(){
+        var key=input.getAttribute('data-bool');
+        saveSetting(key,input.checked?'1':'0');
+      });
+    });
+    //语言按钮：与主程序共用 flow_lang，切换后立即重刷本页全部文案并持久化。
+    document.querySelectorAll('[data-lang]').forEach(function(button){
+      button.addEventListener('click',function(){
+        var next=button.getAttribute('data-lang');
+        if(!I18N[next])return;
+        lang=next;
+        applyLang();
+        $('sourceInfo').textContent=isFile
+          ?t('storage.sourceFile')
+          :t('storage.sourceSite',{host:location.host});
+        loadSettings();
+        renderKeybinds();
+        saveSetting('flow_lang',next,t('settings.langSaved'));
+      });
+    });
+    $('genColor').addEventListener('change',function(){var v=$('genColor').value.trim();if(!v)return;saveSetting('flow_gen_color',v,t('settings.colorSaved'));});
+    $('btnRefresh').onclick=refreshSizes;
+    $('btnClearGraph').onclick=clearGraph;
+    $('graphFile').onchange=function(){importGraph(this.files&&this.files[0]);this.value='';};
+    $('btnExportGraph').onclick=exportGraph;
+    document.querySelectorAll('.key-capture').forEach(function(button){
+      button.addEventListener('click',function(){
+        this.blur();
+        startKeybindEdit(this.getAttribute('data-kb'),this);
+      });
+    });
+    $('btnResetKeys').onclick=resetKeybinds;
+    $('btnClearColors').onclick=function(){resetKeys(['flow_custom_colors'],t('set.clearColors'),t('settings.colorsCleared'));};
+    $('btnResetAlign').onclick=function(){resetKeys(['flow_snap_nodes','flow_snap_size','flow_snap_region_pos','flow_snap_region_size'],t('settings.resetAlign'),t('settings.resetAlignDone'));};
+    $('btnResetAll').onclick=function(){resetKeys(SETTING_KEYS,t('settings.resetAll'),t('settings.resetAllDone'));};
+    window.addEventListener('storage',function(e){
+      if(e.key===DATA_KEY){pageAlert(t('graph.modifiedElsewhere'));refreshSizes();}
+      if(e.key==='flow_lang'){
+        var next=readValue('flow_lang');
+        if(I18N[next]&&next!==lang){
+          lang=next;
+          applyLang();
+          $('sourceInfo').textContent=isFile
+            ?t('storage.sourceFile')
+            :t('storage.sourceSite',{host:location.host});
+          loadSettings();
+          renderKeybinds();
+        }
+        refreshSizes();
+      }
+      if(e.key==='flow_keybinds'){
+        cancelKeybindEdit();
+        loadKeybinds();
+        renderKeybinds();
+        if(!keybindDataError)status('keybindStatus',t('keys.modifiedElsewhere'),'info');
+        refreshSizes();
+      }
+    });
+    loadKeybinds();
+    renderKeybinds();
+    if(storageOK){loadSettings();refreshSizes();}
+  }
+  init();
+})();
+</script>
+</body>
+</html>

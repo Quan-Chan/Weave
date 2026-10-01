@@ -37,8 +37,8 @@ Weave is built with pure front-end technologies — no frameworks, no dependenci
 
 - **Plain JavaScript** — all logic inlined in a single file; the source is the product
 - **HTML5 + CSS3** — semantic structure + CSS variables theme
-- **Canvas 2D** — grid background and connection lines, re-rendered smoothly while panning/zooming
-- **SVG** — overlay layer for Bézier control handles and connection labels with precise interaction
+- **Canvas 2D** — pixel-aligned grid background
+- **SVG** — connections, regions, Bézier control handles, and labels with precise interaction
 - **localStorage** — canvas data persists automatically across refreshes
 
 <hr>
@@ -51,6 +51,28 @@ Archives for stress-testing and demos are bundled under `test/samples/`. Load th
 - **`test/samples/weave_arrow_demo.json`** — a 6-node, 4-connection arrow shape demo
 
 The full-mesh graph (250 nodes, 62,250 connections) is too large to bundle. Double-click `test/samples/gen-fullmesh.cmd` (or run `node gen-fullmesh.js` inside `test/samples/`) to generate `weave_250_fullmesh.json`, then load it via **Import**.
+
+<hr>
+
+## Recovery tool
+
+To clear the graph or change saved settings, close all Weave pages and open the recovery page:
+
+| Scenario | Recovery page |
+| --- | --- |
+| Local download | Open [`APPs/Weave-recovery.html`](APPs/Weave-recovery.html) |
+| Online | <https://quan-chan.github.io/Weave/recovery.html> |
+
+The recovery page shows the character count of saved data, converted to B, KB, and MB with decimal units. It provides these operations:
+
+- clear all nodes, connections, and regions while keeping settings;
+- import or export graph JSON;
+- change alignment, language, new node color, auto-open node details, interface visibility, and the first-run modal (the interface language is the same setting the main app uses);
+- edit 10 keybindings for undo, redo, select all, copy, paste, and other actions; reset keybindings; clear custom colors; reset all settings.
+
+The recovery page states at the top which dataset it is showing. Browsers isolate storage per origin, so the local and online versions each keep a separate dataset and one page cannot read or write the other.
+
+A Weave page may write its in-memory graph when it closes. Close all Weave pages before clearing, importing, or editing keybindings. Keybinding changes apply after reopening Weave.
 
 <hr>
 

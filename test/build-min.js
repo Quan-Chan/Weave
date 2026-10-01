@@ -115,21 +115,52 @@ function postMinifyJs(js) {
   return res;
 }
 
-// ── 组装 ──
-const styleStart = html.indexOf('<style>') + 7;
-const styleEnd = html.indexOf('</style>');
-const scriptStart = html.indexOf('<script>') + 8;
-const scriptEnd = html.indexOf('</script>');
+// ── 组装 + 发布门禁 ──
+function buildResult() {
+  const styleOpen = html.indexOf('<style>');
+  const styleEnd = html.indexOf('</style>');
+  const scriptOpen = html.indexOf('<script>');
+  const scriptEnd = html.indexOf('</script>');
+  if (styleOpen === -1 || styleEnd === -1 || scriptOpen === -1 || scriptEnd === -1) {
+    throw new Error('Weave.html 缺少预期的 style/script 标签');
+  }
 
-const head = html.slice(0, styleStart - 7);            // <!DOCTYPE...<head>...<style>
-const css = minifyCss(html.slice(styleStart, styleEnd));
-const mid = html.slice(styleEnd + 8, scriptStart - 8); // </style>...<body>...</script> 前
-const js = postMinifyJs(minifyJs(html.slice(scriptStart, scriptEnd)));
-const tail = html.slice(scriptEnd);                     // </script></body></html>
+  const head = html.slice(0, styleOpen);
+  const css = minifyCss(html.slice(styleOpen + 7, styleEnd));
+  const mid = html.slice(styleEnd + 8, scriptOpen);
+  const js = postMinifyJs(minifyJs(html.slice(scriptOpen + 8, scriptEnd)));
+  const tail = html.slice(scriptEnd);
+  const result = head + '<style>' + css + '</style>' + mid + '<script>' + js + tail;
 
-const result = head + '<style>' + css + '</style>' + mid + '<script>' + js + tail;
-fs.writeFileSync(OUT, result, 'utf8');
-console.log('✅ 已生成', OUT);
-console.log('原始:', html.length, '字节');
-console.log('压缩:', result.length, '字节 (' + Math.round(result.length / html.length * 100) + '%)');
-console.log('节省:', html.length - result.length, '字节');
+  // 压缩器只做保守词法处理；发布前仍以真实 JS 编译作为独立门禁。
+  const generatedScript = result.slice(result.indexOf('<script>') + 8, result.indexOf('</script>'));
+  new Function(generatedScript);
+  return result;
+}
+
+const result = buildResult();
+const sourceBytes = Buffer.byteLength(html, 'utf8');
+const resultBytes = Buffer.byteLength(result, 'utf8');
+
+if (process.argv.includes('--check')) {
+  if (!fs.existsSync(OUT)) {
+    console.error('❌ 压缩发布文件不存在:', OUT);
+    process.exitCode = 1;
+  } else {
+    const tracked = fs.readFileSync(OUT, 'utf8');
+    if (tracked !== result) {
+      console.error('❌ Weave.min.html 与当前 Weave.html 的生成结果不一致');
+      console.error('   仓库:', Buffer.byteLength(tracked, 'utf8'), 'bytes');
+      console.error('   当前:', resultBytes, 'bytes');
+      process.exitCode = 1;
+    } else {
+      console.log('✅ Weave.min.html 与当前源文件一致（未写入）');
+    }
+  }
+} else {
+  fs.writeFileSync(OUT, result, 'utf8');
+  console.log('✅ 已生成', OUT);
+  console.log('原始:', sourceBytes, 'bytes');
+  console.log('压缩:', resultBytes, 'bytes (' + Math.round(resultBytes / sourceBytes * 100) + '%)');
+  console.log('节省:', sourceBytes - resultBytes, 'bytes');
+}

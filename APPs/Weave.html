@@ -905,6 +905,7 @@ const I18N = {
     'toast.nodeDeleted': '节点已删除', 'toast.nodesDeleted': '已删除 {n} 个节点',
     'toast.connDeleted': '连线已删除', 'toast.connsDeleted': '已删除 {n} 条连线',
     'toast.sizeReset': '已重置节点大小', 'toast.parseFailed': '解析失败: {msg}',
+    'toast.fileReadFailed': '读取文件失败', 'toast.storageSaveFailed': '自动保存失败，请导出 JSON 备份',
     'toast.regionCreated': '已创建分区', 'toast.regionDeleted': '分区已删除',
     'toast.regionModeOn': '分区模式已开启：拖拽画布空白处画分区', 'toast.regionModeOff': '分区模式已关闭',
     'toast.noData': '无数据可导出', 'toast.exported': '已导出',
@@ -988,6 +989,7 @@ const I18N = {
     'toast.nodeDeleted': 'Node deleted', 'toast.nodesDeleted': 'Deleted {n} node(s)',
     'toast.connDeleted': 'Connection deleted', 'toast.connsDeleted': 'Deleted {n} connection(s)',
     'toast.sizeReset': 'Node size reset', 'toast.parseFailed': 'Parse failed: {msg}',
+    'toast.fileReadFailed': 'Failed to read file', 'toast.storageSaveFailed': 'Auto-save failed. Export a JSON backup',
     'toast.regionCreated': 'Region created', 'toast.regionDeleted': 'Region deleted',
     'toast.regionModeOn': 'Region mode on: drag empty canvas to draw', 'toast.regionModeOff': 'Region mode off',
     'toast.noData': 'Nothing to export', 'toast.exported': 'Exported',
@@ -1623,6 +1625,8 @@ const App = window.App = {
   _wheelCleanup: null,
   _selectedGenColor: null,
   readOnly: false,
+  // 画布自动保存失败在当前页面会话中只提示一次；设置键失败仍保持静默。
+  _storageErrorShown: false,
   _autoOpenModal: false,
   /*设置（持久化到 localStorage）：
     4 个对齐设置默认全部开启（常规页提供"重置对齐设置"一键恢复开启）。
@@ -1795,6 +1799,8 @@ const App = window.App = {
   //当前进行中的吸附动画集合（animState 对象也
   //由 el._snapAnim 引用）。
   _activeSnapAnims: new Set(),
+  // 节点拖拽松手后的整组吸附事务：动画完成/取消时只提交一次最终状态。
+  _nodeDragSnapBatch: null,
   _snapDataInterval: null,
   _snapRenderRaf: null,
   //数据流频率（Hz）。240Hz 已覆盖所有消费级显示器。
@@ -1869,7 +1875,7 @@ Object.assign(App, {
     try { return localStorage.getItem(key); } catch (e) { return null; }
   },
   _lsSet(key, value) {
-    try { localStorage.setItem(key, value); } catch (e) { /*忽略*/ }
+    try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
   },
   //localStorage 中的 JSON 读取（解析失败/缺失时返回 null）：
   //初始化与自定义颜色加载共用，替代手写 try/JSON.parse 样板。
@@ -2056,6 +2062,8 @@ Object.assign(App, {
      持久化 localStorage 自动保存，它同时携带视口信息）。这样确保
      撤销/重做步仅代表真实变更。*/
   saveCanvasSnapshot() {
+    //任何其它数据操作都先结束进行中的节点吸附事务，避免把动画中间态入栈。
+    if (this._nodeDragSnapBatch) this._settleNodeDragSnapBatch(false, true);
     //存快照 = 画布数据发生（或即将发生）变更 = 一次画布操作：
     //取消关联高亮（拖动视角/缩放不存快照，因此不受影响）。
     this._clearHighlight();
@@ -2135,11 +2143,17 @@ Object.assign(App, {
   },
 
   saveCanvas() {
-    this._lsSet('flow_data', JSON.stringify(this._serializeData()));
+    const ok = this._lsSet('flow_data', JSON.stringify(this._serializeData()));
+    if (!ok && !this._storageErrorShown) {
+      this._storageErrorShown = true;
+      this.showToast(this.t('toast.storageSaveFailed'), 'error', 5000);
+    }
+    return ok;
   },
 
   canvasUndo() {
     if (this.readOnly) { this.showToast(this.t('toast.readonlyUndo'), 'info'); return; }
+    if (this._nodeDragSnapBatch) this._settleNodeDragSnapBatch(false, true);
     if (this.canvasHistoryIndex <= 0) { this.showToast(this.t('toast.noUndo'), 'info'); return; }
     this.canvasHistoryIndex--;
     this._restoreCanvasSnapshot(this.canvasState.history[this.canvasHistoryIndex]);
@@ -2149,6 +2163,7 @@ Object.assign(App, {
 
   canvasRedo() {
     if (this.readOnly) { this.showToast(this.t('toast.readonlyRedo'), 'info'); return; }
+    if (this._nodeDragSnapBatch) this._settleNodeDragSnapBatch(false, true);
     if (this.canvasHistoryIndex >= this.canvasState.history.length - 1) { this.showToast(this.t('toast.noRedo'), 'info'); return; }
     this.canvasHistoryIndex++;
     this._restoreCanvasSnapshot(this.canvasState.history[this.canvasHistoryIndex]);
@@ -2194,18 +2209,22 @@ Object.assign(App, {
   _validateLoadedData(data) {
     const nodeIds = new Set();
     data.nodes.forEach((n, i) => {
+      if (!n || typeof n !== 'object' || Array.isArray(n)) return;
       if (!n.id || typeof n.id !== 'string') n.id = this._genId() + '_fix' + i;
       if (nodeIds.has(n.id)) { let _s = 1; while (nodeIds.has(n.id + '_' + _s)) _s++; n.id = n.id + '_' + _s; }
       nodeIds.add(n.id);
-      if (typeof n.x !== 'number' || isNaN(n.x)) n.x = WORLD_CENTER_X + ((i % 4) - 1) * 300;
-      if (typeof n.y !== 'number' || isNaN(n.y)) n.y = START_Y;
+      if (!Number.isFinite(n.x)) n.x = WORLD_CENTER_X + ((i % 4) - 1) * 300;
+      if (!Number.isFinite(n.y)) n.y = START_Y;
       if (!n.label || typeof n.label !== 'string') n.label = this.t('misc.untitled');
+      if (typeof n.desc !== 'string') n.desc = '';
+      if (typeof n.color !== 'string' || (!COLORS.includes(n.color) && !RE_HEX6.test(n.color))) n.color = 'blue';
+      n.mirrored = n.mirrored === true;
       //所有节点都是统一的：始终具有尺寸且可调整大小。
-      if (typeof n.w !== 'number' || !isFinite(n.w)) n.w = NODE_DEFAULT_W; else if (n.w < NODE_MIN_W) n.w = NODE_MIN_W;
-      if (typeof n.h !== 'number' || !isFinite(n.h)) n.h = NODE_DEFAULT_H; else if (n.h < NODE_MIN_H) n.h = NODE_MIN_H;
+      if (!Number.isFinite(n.w)) n.w = NODE_DEFAULT_W; else if (n.w < NODE_MIN_W) n.w = NODE_MIN_W;
+      if (!Number.isFinite(n.h)) n.h = NODE_DEFAULT_H; else if (n.h < NODE_MIN_H) n.h = NODE_MIN_H;
       //收起记录清洗（结构层）：非对象 / hidden 非数组 / 字段缺型 → 剔除。
       //引用层校验放在 nodeIds 全部确定之后（id 可能被重映射）。
-      if (n.collapse && (typeof n.collapse !== 'object' || !Array.isArray(n.collapse.hidden))) {
+      if (n.collapse && (typeof n.collapse !== 'object' || Array.isArray(n.collapse) || !Array.isArray(n.collapse.hidden))) {
         delete n.collapse;
       }
     });
@@ -2231,17 +2250,19 @@ Object.assign(App, {
       //缺失的 id 为其生成，文件中重复的 id 则重新生成。
       const seenConnIds = new Set();
       data.connections = data.connections.filter(c => {
+        if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
         if (typeof c.from !== 'string' || typeof c.to !== 'string') return false;
         if (!validIds.has(c.from) || !validIds.has(c.to)) return false;
         if (typeof c.id !== 'string' || !c.id || seenConnIds.has(c.id)) c.id = this._genId('c');
         while (seenConnIds.has(c.id)) c.id = this._genId('c');
         seenConnIds.add(c.id);
+        if (typeof c.label !== 'string') c.label = '';
         //仅丢弃有问题的控制点，保留连线本身。
         if (c.cp1 !== undefined && sanitizeCp(c.cp1) === null) delete c.cp1;
         if (c.cp2 !== undefined && sanitizeCp(c.cp2) === null) delete c.cp2;
         //连线的镜像（mirror）属性锁定其箭头方向。旧文件
         //缺少该属性——从源节点输出端的镜像状态迁移而来。
-        c.mirrored = c.mirrored === undefined ? !!nodeMir[c.from] : !!c.mirrored;
+        c.mirrored = c.mirrored === undefined ? !!nodeMir[c.from] : c.mirrored === true;
         return true;
       });
     } else {
@@ -2298,58 +2319,104 @@ Object.assign(App, {
     }
   },
 
-  //导入/加载路径：将序列化存档解析为全新的画布状态
-  //（网格→像素转换、校验、新的撤销基线、视口决策）。
+  //导入准备阶段：只在 candidate 上复制、换算与清洗。此阶段不修改
+  // canvasState / history / 选区 / 视口 / 缓存，失败时可完整保留旧状态。
+  _prepareSerializedData(d) {
+    const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+    if (!isObject(d) || !Array.isArray(d.nodes)) return null;
+    if (d.connections !== undefined && !Array.isArray(d.connections)) return null;
+    if (d.regions !== undefined && !Array.isArray(d.regions)) return null;
+
+    const fromGrid = value => {
+      if (!Number.isFinite(value)) return value;
+      const scaled = value * GRID_PX;
+      return Number.isFinite(scaled) ? scaled : Number.NaN;
+    };
+    const nodes = d.nodes.filter(isObject).map(n => {
+      const copy = { ...n };
+      copy.x = fromGrid(n.x);
+      copy.y = fromGrid(n.y);
+      copy.w = fromGrid(n.w);
+      copy.h = fromGrid(n.h);
+      if (isObject(n.collapse) && Array.isArray(n.collapse.hidden)) {
+        copy.collapse = { hidden: n.collapse.hidden.map(h => {
+          if (!isObject(h)) return h;
+          const hc = { ...h };
+          hc.dx = fromGrid(h.dx);
+          hc.dy = fromGrid(h.dy);
+          return hc;
+        }) };
+      }
+      return copy;
+    });
+    const connections = (d.connections || []).filter(isObject).map(c => {
+      const copy = { ...c };
+      if (isObject(c.cp1)) copy.cp1 = { ...c.cp1 };
+      if (isObject(c.cp2)) copy.cp2 = { ...c.cp2 };
+      return copy;
+    });
+    const regions = (d.regions || []).filter(isObject).map(r => ({
+      ...r,
+      x: fromGrid(r.x),
+      y: fromGrid(r.y),
+      w: fromGrid(r.w),
+      h: fromGrid(r.h),
+      nodeIds: Array.isArray(r.nodeIds) ? r.nodeIds.slice() : r.nodeIds
+    }));
+
+    const candidate = { nodes, connections, regions };
+    const idSeqBefore = this._idSeq;
+    try {
+      this._validateLoadedData(candidate);
+    } catch (e) {
+      // 校验失败时连 ID 序列也不前进；candidate 本身随后被丢弃。
+      this._idSeq = idSeqBefore;
+      return null;
+    }
+
+    let viewport = null;
+    if (d.viewport !== undefined && d.viewport !== null) {
+      if (!isObject(d.viewport)) { this._idSeq = idSeqBefore; return null; }
+      const rawScale = Number.isFinite(d.viewport.scale) && d.viewport.scale > 0 ? d.viewport.scale : 1;
+      viewport = {
+        panX: Number.isFinite(d.viewport.panX) ? d.viewport.panX : 0,
+        panY: Number.isFinite(d.viewport.panY) ? d.viewport.panY : 0,
+        scale: Weave.Util.clamp(rawScale, 0.15, 5)
+      };
+    }
+    return { candidate, viewport };
+  },
+
+  //导入/加载路径：candidate 完整通过后才提交为全新画布状态。
   //与 _restoreCanvasSnapshot 不同，后者重放撤销/重做历史。
-  //统一的“用序列化数据替换整个画布”路径，由 JSON 导入
-  //和启动恢复二者共用。处理：网格→像素转换、
-  //校验、层叠顺序重建、历史重置、添加锚点重置、渲染
-  //以及视口三向决策（存储的视口 / 适应节点 /
-  //居中原点）。快照与 toast 由调用方负责。
   _restoreFromSerialized(d, opts) {
     opts = opts || {};
-    if (!d.nodes || !Array.isArray(d.nodes)) return false;
-    //存档单位约定：x/y/w/h（节点与分区）与 collapse.dx/dy 一律为“格”单位，
-    //加载时整体 ×GRID_PX 还原为世界像素（与 _serializeData 对称）。
-    //非法条目（null/缺型）跳过换算，由 _validateLoadedData 清洗剔除。
-    d.nodes.forEach((n) => {
-      n.x *= GRID_PX; n.y *= GRID_PX;
-      if (isFinite(n.w)) n.w *= GRID_PX;
-      if (isFinite(n.h)) n.h *= GRID_PX;
-      //收起记录的相对偏移与 x/y 同为网格单位（见 _serializeData）：还原为像素。
-      if (n.collapse && Array.isArray(n.collapse.hidden)) {
-        n.collapse.hidden.forEach(h => { if (h && isFinite(h.dx) && isFinite(h.dy)) { h.dx *= GRID_PX; h.dy *= GRID_PX; } });
-      }
-    });
-    this.canvasState.nodes = d.nodes;
-    this.canvasState.connections = Array.isArray(d.connections) ? d.connections : [];
-    //分区还原：坐标与尺寸换算为像素（与节点同规则）；无 regions 键的存档兼容为空。
-    if (Array.isArray(d.regions)) {
-      d.regions.forEach(r => {
-        r.x *= GRID_PX; r.y *= GRID_PX;
-        if (isFinite(r.w)) r.w *= GRID_PX;
-        if (isFinite(r.h)) r.h *= GRID_PX;
-      });
-      this.canvasState.regions = d.regions;
-    } else {
-      this.canvasState.regions = [];
+    const prepared = this._prepareSerializedData(d);
+    if (!prepared) return false;
+    const candidate = prepared.candidate;
+
+    // candidate 已通过后才冻结旧画布。导入会丢弃旧手势，因此旧 batch
+    // 只取消动画并同步最后可见位置，不再保存旧移动或改写新画布历史。
+    if (this._nodeDragSnapBatch) {
+      this._nodeDragSnapBatch.discardOnSettle = true;
+      this._settleNodeDragSnapBatch(false, true);
     }
-    this._connOffsCache = null;   //全新画布 → 重建派生缓存
+    this.canvasState.nodes = candidate.nodes;
+    this.canvasState.connections = candidate.connections;
+    this.canvasState.regions = candidate.regions;
+    this._connOffsCache = null;
     this._nodeByIdCache = null;
     this._collapseDerived = null;
-    this._validateLoadedData(this.canvasState);
-    let newViewport = false;
-    if (d.viewport && typeof d.viewport.panX === 'number') {
-      this.panX = d.viewport.panX;
-      this.panY = Number.isFinite(d.viewport.panY) ? d.viewport.panY : 0;
-      this.scale = Number.isFinite(d.viewport.scale) ? d.viewport.scale : 1;
-      newViewport = true;
+
+    const newViewport = prepared.viewport !== null;
+    if (newViewport) {
+      this.panX = prepared.viewport.panX;
+      this.panY = prepared.viewport.panY;
+      this.scale = prepared.viewport.scale;
     }
     //导入的数据是全新的撤销基线；启动历史本就是空的。
     this.canvasState.history = [];
     this.canvasHistoryIndex = -1;
-    //清除过期的选区/临时编辑状态（与 _restoreCanvasSnapshot 一致），
-    //使旧 id 绝不会悬空残留到新画布中。
     this.selectedNodeIds.clear();
     this.selectedConnIds.clear();
     this.selectedRegionId = null;
@@ -2358,23 +2425,28 @@ Object.assign(App, {
     this._curveEditState = null;
     this._removeCurveHandles();
     this._hideResizeHandles();
-    //重置添加锚点（add-anchor），使刚导入的文件（该文件可能已
-    //改变视口）从新的视口中心开始 addNode。
     this._resetAddAnchor();
     this.renderCanvas({ center: false });
-    //在 renderCanvas 之后重建层叠顺序，使骨架创建路径
-    //（它会清空 _nodeZOrder）无法将它清掉。
     this._rebuildZOrder();
-    if (newViewport) this.applyViewTransform();
-    else if (this.canvasState.nodes.length > 0) this.centerCanvasOnNodes();
+    if (newViewport) {
+      this._refreshContainerCache();
+      this.clampPan();
+      this.applyViewTransform();
+    } else if (this.canvasState.nodes.length > 0) this.centerCanvasOnNodes();
     else if (opts.emptyToOrigin) this.centerCanvasOnOrigin();
     return true;
   },
 
   _loadFromData(d) {
-    if (!this._restoreFromSerialized(d, { emptyToOrigin: false })) { this.showToast(this.t('toast.invalidFile'), 'error'); return; }
-    this.saveCanvasSnapshot();
+    if (this.readOnly) { this.showToast(this.t('toast.readonlyImport'), 'warning'); return false; }
+    if (!this._restoreFromSerialized(d, { emptyToOrigin: false })) {
+      this.showToast(this.t('toast.invalidFile'), 'error');
+      return false;
+    }
+    //成功提示先入队；若随后存储失败，错误提示会替换它。
     this.showToast(this.t('toast.importOk'));
+    this.saveCanvasSnapshot();
+    return true;
   }
 });
 
@@ -2842,9 +2914,12 @@ Object.assign(App, {
     if (visNodes.length) {
       const bb = Weave.Geom.nodesBBox(visNodes, n => Weave.Geom.getNodeRect(n));
       minX = bb.minX; maxX = bb.maxX; minY = bb.minY; maxY = bb.maxY;
-    } else {
+    } else if (this.canvasState.regions.length) {
       const r0 = this.canvasState.regions[0];
       minX = r0.x; maxX = r0.x + r0.w; minY = r0.y; maxY = r0.y + r0.h;
+    } else {
+      this.centerCanvasOnOrigin();
+      return;
     }
     //分区参与适应视图：把每个分区矩形并入包围盒。
     this.canvasState.regions.forEach(r => {
@@ -3052,6 +3127,9 @@ Object.assign(App, {
   _prepCanvas() {
     const canvas = document.getElementById('canvasContainer');
     if (!canvas) return false;
+    //当前 renderCanvas 会取消节点吸附动画；先按最后可见位置提交事务，
+    //随后本次 renderCanvas 直接使用已冻结的数据。
+    if (this._nodeDragSnapBatch) this._settleNodeDragSnapBatch(false, true);
     this._nodeElMap.forEach(el => { this._cancelSnapAnim(el); });
     this._cancelRegionSnapAnim();
     return true;
@@ -4250,6 +4328,40 @@ Object.assign(App, {
     this._activeSnapAnims.add(animState);
     if (this._snapDataInterval === null) this._snapDataInterval = setInterval(this._snapDataTick, 1000 / this._snapDataHz);
     if (this._snapRenderRaf === null) this._snapRenderRaf = requestAnimationFrame(this._snapRenderTick);
+    return animState;
+  },
+
+  // 结束一次节点拖拽的整组吸附事务。completed=true 使用最终网格目标；
+  // 取消时读取 DOM transform，冻结到最后可见位置。deferRender=true 用于
+  // 调用方本身正进入 renderCanvas / undo / 新拖拽 / 页面卸载的场景。
+  _settleNodeDragSnapBatch(completed, deferRender) {
+    const batch = this._nodeDragSnapBatch;
+    if (!batch) return false;
+    this._nodeDragSnapBatch = null;
+    let changed = false;
+    for (const [id, entry] of batch.entries) {
+      const node = this._getNodeById(id);
+      const el = this._nodeElMap.get(id);
+      if (!node || !el) continue;
+      let x = entry.targetX;
+      let y = entry.targetY;
+      if (!completed) {
+        const match = (el.style.transform || '').match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+        if (match) {
+          const visualX = parseFloat(match[1]);
+          const visualY = parseFloat(match[2]);
+          if (Number.isFinite(visualX) && Number.isFinite(visualY)) { x = visualX; y = visualY; }
+        }
+      }
+      if (x !== entry.origX || y !== entry.origY) changed = true;
+      node.x = x;
+      node.y = y;
+      if (el._snapAnim) this._cancelSnapAnim(el);
+      el.style.transform = T(x, y);
+    }
+    if (batch.onSettle) batch.onSettle(changed, deferRender);
+    if (!deferRender) this.renderLines();
+    return changed;
   },
 
   // 数据流 tick（setInterval，恒定 240Hz）：通过用墙钟时间索引帧数组来推进每个
@@ -4722,7 +4834,7 @@ Object.assign(App, {
       const fn = boxNodeMap.get(conn.from);
       const tn = boxNodeMap.get(conn.to);
       if (!fn || !tn) return;
-      if (this._isConnectionCollapseHidden(conn)) return;   //收起隐藏连线不参与框选
+      if (this._isConnectionCollapseHidden(conn)) return;
       const g = this._getConnGeometry(conn, fn, tn);
       const p0 = g.fromOut, p1 = { x: g.fromOut.x + g.cp.c1x, y: g.fromOut.y + g.cp.c1y };
       const p2 = { x: g.toIn.x + g.cp.c2x, y: g.toIn.y + g.cp.c2y }, p3 = g.toIn;
@@ -5062,6 +5174,7 @@ Object.assign(App, {
   // ── 节点拖拽 ── 
   startNodeDrag(e, nodeId) {
     if (this.readOnly) return;
+    if (this._nodeDragSnapBatch) this._settleNodeDragSnapBatch(false, true);
     this._hideResizeHandles();
     //关闭残留的提示气泡——拖拽时鼠标一直停留在节点上方，
     //因此 mouseout 永远不会触发，提示气泡会一直停留不动。
@@ -5139,40 +5252,39 @@ Object.assign(App, {
     }
 
     function onUp() {
-      let positionChanged = false;
-      //拖拽节点列表在 dragState 置空前捕获（供落位后归属同步）。
+      //拖拽节点列表在 dragState 置空前捕获。每项分别记录拖拽起点、
+      //松手视觉位置和最终吸附目标，逻辑位置变化不再由动画偏移代替。
       const draggedIds = self.dragState && self.dragState.nodes ? self.dragState.nodes.map(n => n.id) : [];
+      const entries = [];
+      let anyFinalChange = false;
+      let anyAnimation = false;
       if (dragRafId) { cancelAnimationFrame(dragRafId); dragRafId = null; }
       if (self.dragState && self.dragState.nodes) {
         for (const n of self.dragState.nodes) {
           const nodeObj = self._getNodeById(n.id);
-          if (!nodeObj) continue;
-          //在覆盖为吸附目标之前，先捕获当前视觉位置。
-          //如果用 snappedX 与 n.origX（拖拽前的位置）比较，
-          //会误判单元格内的拖拽（100→102，两者都吸附
-          //到 100）为"未移动"而跳过动画——节点会
-          //直接瞬移到吸附目标而不是播放动画（"近瞬移"
-          //bug）。正确的问题是：节点是否需要从其
-          //当前视觉位置移动到吸附目标？
+          const el = self._nodeElMap.get(n.id);
+          if (!nodeObj || !el) continue;
           const visualX = nodeObj.x;
           const visualY = nodeObj.y;
-          const snappedX = self._snap(visualX);
-          const snappedY = self._snap(visualY);
-          //positionChanged 也会控制下面的 saveCanvasSnapshot——不需要吸附
-          //就意味着不需要保存快照。
-          if (snappedX !== visualX || snappedY !== visualY) positionChanged = true;
-          nodeObj.x = snappedX;
-          nodeObj.y = snappedY;
-          const el = self._nodeElMap.get(n.id);
-          if (el) {
-            el.classList.remove('dragging');
-            //传入 nodeObj，使动画能在每一帧
-            //保持 node.x/y 与视觉位置同步（动画中间调用也安全）。
-            //回弹动画只对网格吸附有意义；当
-            //"对齐节点"关闭时，吸附目标至多相差一个亚像素，因此
-            //直接写入最终的 transform 即可。
-            if (positionChanged && self._snapNodes) self._animateNodeToGrid(el, nodeObj, snappedX, snappedY);
-            else el.style.transform = T(snappedX, snappedY);
+          const targetX = self._snap(visualX);
+          const targetY = self._snap(visualY);
+          const finalChanged = targetX !== n.origX || targetY !== n.origY;
+          const needsAnimation = self._snapNodes && (targetX !== visualX || targetY !== visualY);
+          entries.push({
+            id: n.id,
+            origX: n.origX,
+            origY: n.origY,
+            targetX,
+            targetY,
+            needsAnimation
+          });
+          if (finalChanged) anyFinalChange = true;
+          if (needsAnimation) anyAnimation = true;
+          el.classList.remove('dragging');
+          if (!needsAnimation) {
+            nodeObj.x = targetX;
+            nodeObj.y = targetY;
+            el.style.transform = T(targetX, targetY);
           }
         }
       }
@@ -5189,16 +5301,39 @@ Object.assign(App, {
       self.isDragging = false;
       self._nodeElMap.forEach(el => { el.style.transition = ''; });
       self.renderLines();
-      //节点落位后同步显式归属：拖入分区自动加入 nodeIds、拖出自动移除。
-      //在 saveCanvasSnapshot 之前做（归属变化随本次移动一并入栈）。
-      if (positionChanged) {
-        const movedIds = draggedIds;
-        let membershipChanged = false;
-        movedIds.forEach(nid => {
-          if (self._syncNodeRegionMembership(nid)) membershipChanged = true;
-        });
-        if (membershipChanged) self.renderCanvas({ center: false });
-        self.saveCanvasSnapshot();
+
+      if (anyFinalChange || anyAnimation) {
+        const batch = {
+          entries: new Map(entries.map(entry => [entry.id, entry])),
+          pendingAnimations: 0,
+          onSettle: (changed, deferRender) => {
+            if (!changed || batch.discardOnSettle) return;
+            //动画完成/取消后再同步归属，整组只落一次历史。
+            let membershipChanged = false;
+            draggedIds.forEach(nid => {
+              if (self._syncNodeRegionMembership(nid)) membershipChanged = true;
+            });
+            if (membershipChanged && !deferRender) self.renderCanvas({ center: false });
+            self.saveCanvasSnapshot();
+          }
+        };
+        self._nodeDragSnapBatch = batch;
+        for (const entry of entries) {
+          if (!entry.needsAnimation) continue;
+          const nodeObj = self._getNodeById(entry.id);
+          const el = self._nodeElMap.get(entry.id);
+          if (!nodeObj || !el) continue;
+          const anim = self._animateNodeToGrid(el, nodeObj, entry.targetX, entry.targetY);
+          if (!anim) continue;
+          batch.pendingAnimations++;
+          anim.onDone = () => {
+            if (self._nodeDragSnapBatch !== batch) return;
+            batch.pendingAnimations--;
+            if (batch.pendingAnimations === 0) self._settleNodeDragSnapBatch(true, false);
+          };
+        }
+        if (batch.pendingAnimations === 0) self._settleNodeDragSnapBatch(true, false);
+      } else {
       }
       //在空白画布上结束的真实拖拽会产生一次浏览器 click，它
       //会清除刚拖拽出的选中——吞掉接下来的一次画布
@@ -5456,7 +5591,10 @@ Object.assign(App, {
     if (b.shift) parts.push('Shift');
     //纯修饰键手势（key 哨兵 'any'，无主键）：只显示修饰键，如 "Alt"。
     const k = b.key;
-    if (k !== 'any') parts.push(k.length === 1 ? k.toUpperCase() : k);
+    if (k !== 'any') {
+      const names = { backspace: 'Backspace', delete: 'Delete', enter: 'Enter', escape: 'Escape', tab: 'Tab', arrowup: 'ArrowUp', arrowdown: 'ArrowDown', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown' };
+      parts.push(k === ' ' ? 'Space' : (names[k] || (/^f\d{1,2}$/.test(k) ? k.toUpperCase() : (k.length === 1 ? k.toUpperCase() : k))));
+    }
     return parts.join('+');
   },
   //关联高亮触发键匹配：当前按下的修饰键集合 == hlNode 绑定（key 忽略）。
@@ -6902,12 +7040,18 @@ Object.assign(App, {
   //读取一个 JSON 文件并通过 _loadFromData 路由处理（拖拽导入与
   //文件选择导入两种方式共用）。
   _readJsonFile(f) {
+    if (this.readOnly) { this.showToast(this.t('toast.readonlyImport'), 'warning'); return false; }
     const r = new FileReader();
     r.onload = () => {
+      //读取期间可能切换到只读；共享加载入口仍需再次守卫。
+      if (this.readOnly) { this.showToast(this.t('toast.readonlyImport'), 'warning'); return; }
       try { const d = JSON.parse(r.result); this._loadFromData(d); }
       catch (err) { this.showToast(this.t('toast.parseFailed', { msg: err.message }), 'error'); }
     };
+    r.onerror = () => this.showToast(this.t('toast.fileReadFailed'), 'error');
+    r.onabort = () => this.showToast(this.t('toast.fileReadFailed'), 'error');
     r.readAsText(f);
+    return true;
   },
   //JSON / PNG 导出共用的导出守卫：没有可导出的内容（节点或分区皆无）
   //→ 发出警告并中止。
@@ -7615,6 +7759,8 @@ document.getElementById('regionModal').addEventListener('click', function(e) { i
 document.addEventListener('keydown', function(e) {
   const tag = (e.target.tagName || '').toLowerCase();
   const isEditing = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+  //文本编辑保留浏览器原生快捷键；Escape 仍交给下方关闭流程。
+  if (isEditing && e.key !== 'Escape') return;
   if (App._keyMatch('undo', e)) { e.preventDefault(); App.canvasUndo(); }
   else if (App._keyMatch('redo', e)) { e.preventDefault(); App.canvasRedo(); }
   else if (App._keyMatch('selectAll', e)) { if (!isEditing) { e.preventDefault(); App.selectAllNodes(); } }
@@ -7807,7 +7953,10 @@ document.addEventListener('keydown', function(e) {
   panel.addEventListener('mouseleave', (e) => { if (e.relatedTarget && dd.contains(e.relatedTarget)) return; hidePanel(); });
 })();
 
-window.addEventListener('beforeunload', function() { App.saveCanvas(); });
+window.addEventListener('beforeunload', function() {
+  if (App._nodeDragSnapBatch) App._settleNodeDragSnapBatch(false, true);
+  else App.saveCanvas();
+});
 window.addEventListener('resize', function() { App.applyViewTransform(); });
 </script>
 </body>

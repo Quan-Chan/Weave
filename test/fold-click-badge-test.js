@@ -62,7 +62,14 @@ const { launchBrowser, openApp, sleep } = require('./helpers/launch.js');
   await sleep(200);
   await page.mouse.down();
   await page.mouse.move(aOut.x + 60, aOut.y + 30, { steps: 5 });
-  await sleep(50);
+  await page.waitForFunction(() => {
+    const out = document.querySelector('.node[data-node-id="x_A"] .socket.out');
+    if (!out || !out.classList.contains('dragging')) return false;
+    const transform = getComputedStyle(out).transform;
+    if (!transform || transform === 'none') return false;
+    const match = transform.match(/matrix\(([^,]+)/);
+    return !!match && parseFloat(match[1]) >= 1.59;
+  }, { timeout: 1500 }).catch(() => {});
   const dgSnap = await snap();
   console.log('drag move:', JSON.stringify(dgSnap));
   // 断言 2: 真拖拽时徽标保持可见(中心元素不消失),socket 放大到 1.6×

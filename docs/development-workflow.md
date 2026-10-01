@@ -35,7 +35,10 @@
 | I18N 文案或语言逻辑修改 | cd test && npm run test:i18n |
 | 任意代码修改后，结构守护 | cd test && npm run test:structure |
 | Weave.html 修改，GUI 冒烟 | cd test && npm run test:gui |
+| 压缩发布版修改 | cd test && npm run test:min |
 | 收起功能 | cd test && npm run test:collapse |
+| 导入/持久化/编辑快捷键 | cd test && npm run test:data-safety |
+| 恢复工具/本地存档救援 | cd test && npm run test:recovery |
 | 分区功能 | cd test && npm run test:region |
 | fold 渲染族 | cd test && npm run test:fold |
 | 关联高亮 | cd test && npm run test:hl |
@@ -50,6 +53,8 @@ npm scripts 与测试文件的对应关系：
 - test:structure = check-structure.js
 - test:gui = gui-smoke.js
 - test:collapse = collapse-test.js + collapse-edge-test.js
+- test:data-safety = data-safety-gui-test.js
+- test:recovery = recovery-tool-test.js
 - test:region = region-smoke.js
 - test:fold = fold-click-badge-test.js + fold-flush-sync-test.js + fold-zoom-twitch-test.js
 - test:hl = hl-smoke.js + hl-keybind-test.js + hl-keybind-ui-test.js
@@ -60,6 +65,7 @@ npm scripts 与测试文件的对应关系：
 - test:fast = check-version.js + geom-unit-test.js + i18n-keys.js + check-structure.js
 - test:version = check-version.js
 - test:i18n = i18n-keys.js
+- test:min = build-min.js --check + min-smoke.js
 
 单独运行单个测试文件：在仓库根目录执行 node test/文件名.js。测试台架与测试清单见 ../test/README.md。
 

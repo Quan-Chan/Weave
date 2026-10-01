@@ -4,11 +4,14 @@
 
 ## 存在形式
 
-APPs/Weave.html 是 Weave 唯一的应用程序文件。所有 HTML、CSS、JavaScript 内联在同一文件中，不拆分为多文件结构，不引入本地文件依赖。
+APPs/Weave.html 是 Weave 主程序唯一的应用程序文件。所有 HTML、CSS、JavaScript 内联在同一文件中，不拆分为多文件结构，不引入本地文件依赖。
 
 APPs/ 目录下另有：
 
 - APPs/Weave.min.html — 由 test/build-min.js 生成的压缩发布版，存档格式与 localStorage 键与完整版一致
+- APPs/Weave-recovery.html — 独立的恢复与设置面板；显示本地数据占用，调整 Weave 设置与键位，清空节点图，并支持节点图 JSON 导入/导出；不加载主程序，不创建节点、连线或分区 DOM。页面顶部声明当前查看的是哪一份数据——浏览器按来源隔离存储，本地文件与在线站点各存一份，页面无法跨来源读写
+  - 该文件不生成压缩产物：`test/build-min.js` 只处理主程序。它同样纳入测试与在线部署工作流（部署为站点根目录的 `recovery.html`），差异仅在于没有 min 版
+  - 界面语言与主程序共用 `localStorage` 的 `flow_lang` 键，词典为本文件内的独立 `I18N`，由 `test/i18n-recovery.js` 守护；新增语言需同时在本页词典与键位按钮中登记
 - 其他 HTML 文件 — 独立的历史应用，与 Weave 无关
 
 APPs/Weave.html 的浏览器兼容性说明见 ../UnsupportedBrowsers/README.md。

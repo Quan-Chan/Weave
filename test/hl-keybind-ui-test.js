@@ -30,6 +30,15 @@ const ok = (c, m) => { console.log((c ? '  ✅ ' : '  ❌ ') + m); if (!c) fails
     return { value: inp.value, desc: desc.textContent.trim(), hasReset: !!document.getElementById('btnResetKeybinds') };
   });
   ok(info && info.value === 'Alt', '设置弹窗显示 hlNode 行, 默认值 ' + (info && info.value) + ' (描述: ' + (info && info.desc) + ')');
+  const namedKeys = await page.evaluate(() => ({
+    del: App._keybindLabel({ key: 'delete' }),
+    space: App._keybindLabel({ key: ' ' }),
+    f1: App._keybindLabel({ key: 'f1' }),
+    arrow: App._keybindLabel({ key: 'arrowup' }),
+    letter: App._keybindLabel({ key: 'k' })
+  }));
+  ok(namedKeys.del === 'Delete' && namedKeys.space === 'Space' && namedKeys.f1 === 'F1' && namedKeys.arrow === 'ArrowUp' && namedKeys.letter === 'K',
+     '键名显示格式: ' + JSON.stringify(namedKeys));
   // 点击该输入框开始录制 → 按下 Ctrl（modifiers 2 的 keydown）
   await page.evaluate(() => { const inp = document.querySelector('input[data-kb="hlNode"]'); inp.click(); });
   await sleep(200);

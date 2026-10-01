@@ -17,7 +17,9 @@ cd test && npm test          # 统一入口: 串行跑全部断言型测试
 | 只改纯函数(Weave.*) | `npm run test:fast` | ~1s |
 | 改 Weave.html 任意代码 | `npm run test:structure` + `npm run test:gui` | ~1min |
 | 改某功能域(collapse/region/undo…) | 对应 `npm run test:<域>` | ~1-2min |
-| 提交前完整回归 | `npm test` | ~5min |
+| 改导入/持久化/编辑快捷键 | `npm run test:data-safety` | ~10s |
+| 改恢复工具或本地存档救援 | `npm run test:recovery` | ~15s |
+| 提交前完整回归（含压缩版门禁） | `npm test` | ~5min |
 | 模块化重构前(不常做) | `node test/diff-test.js`(重构前先提交既有改动) | ~3min |
 
 **推荐开发循环**:
@@ -64,8 +66,8 @@ if [ $? -ne 0 ]; then echo "❌ 结构/单测未通过,禁止提交"; exit 1; fi
 - `mkNode(id,label,x,y)` / `installFactories(page)` — 布置工厂(注入页面级 `__testMk/__testChain/__testReset`)
 - `sleep` / `shotsDir(name)` / `EDGE` / `APP_URL`
 
-已迁移: fold-flush-sync / collapse-edge / fold-click-badge / fold-zoom-twitch / undo-cap。
-未迁移(仍自带样板): gui-smoke / region-smoke / collapse-test / node-drag-snap / hl-smoke /
+已迁移: fold-flush-sync / collapse-edge / fold-click-badge / fold-zoom-twitch / undo-cap / node-drag-snap / data-safety / recovery-tool / min-smoke。
+未迁移(仍自带样板): gui-smoke / region-smoke / collapse-test / hl-smoke /
 hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 
 ## 测试
@@ -75,10 +77,13 @@ hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 | 文件 | 层级 | 职责 | 何时跑 |
 |---|---|---|---|
 | check-version.js | 静态 | 版本号一致性(应用/CHANGELOG/git tag) | 发版或改版本号后 |
-| i18n-keys.js | 静态 | I18N 键集、占位符、英文词典与静态引用 | 每次改语言文案或 Weave.html 后 |
+| i18n-keys.js | 静态 | 主程序 I18N 键集、占位符、英文词典与静态引用 | 每次改语言文案或 Weave.html 后 |
+| i18n-recovery.js | 静态 | 恢复页 I18N 键集、占位符、英文无中文、无硬编码中文文案 | 每次改语言文案或 Weave-recovery.html 后 |
 | check-structure.js | 静态 | 模块化结构守护(M01→M13/条目等价) | 每次改 Weave.html 后 |
 | geom-unit-test.js | 单测 | collapse 闭包/多父冲突纯函数 | 每次改 collapse 逻辑 |
 | gui-smoke.js | 冒烟 | 核心交互主路径(建节点/连线/设置/i18n) | 每次改 Weave.html 后 |
+| data-safety-gui-test.js | 专项 | 导入原子性/只读入口/编辑态快捷键/存储失败提示 | 改导入、快捷键或持久化后 |
+| recovery-tool-test.js | 专项/性能 | 恢复页不渲染图；占用显示、清空节点图、JSON 导入导出、软件设置、10 项键位录制与配额失败；中英文切换与两语提示；本地与在线两种来源各自的读写与互不可见 | 改恢复工具或存档救援后(`test:recovery`) |
 | region-smoke.js | 专项 | 分区全功能(63 断言) | 改分区相关后 |
 | collapse-test.js | 专项 | 收起主流程(需求1-5) | 改 collapse 后 |
 | collapse-edge-test.js | 专项 | 收起边界(撤销/删除/序列化) | 改 collapse/undo 后 |
@@ -92,8 +97,9 @@ hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 | node-drag-snap-test.js | 专项 | 节点拖拽吸附动画/监听泄漏 | 改吸附/动画后(`test:dragsnap`) |
 | undo-cap-test.js | 专项 | 撤销栈 50 步上限 | 改 undo/历史后 |
 | repro-bugs.js | 回归 | 三个历史 bug 不再复现 | 改 collapse/导入/手势后 |
+| min-smoke.js | 冒烟 | 压缩发布版启动/建节点/连线/撤销 | 每次改 Weave.html 后 |
 | diff-test.js | 差分 | git HEAD 双页对比(**仅重构前适用**) | 模块化重构前手动 |
-| build-min.js | 工具 | 生成 Weave.min.html(**非测试**) | 发布时 |
+| build-min.js | 工具/门禁 | 生成 Weave.min.html；`--check` 只比较不写入 | 发布及每次完整回归 |
 
 > 命名规范: `{功能}-{层级}-test.js`。`*-smoke.js`(gui/region/hl)、`check-structure.js`、
 > `i18n-keys.js`、`repro-bugs.js` 为规范确定前的历史命名,保持不改。
@@ -119,6 +125,17 @@ npm install --cache ./.npm-cache    # 首次（或 node_modules 丢失时）
 cd ..
 node test/gui-smoke.js              # 无头运行
 node test/gui-smoke.js --headed     # 有头运行（可观察窗口）
+```
+
+### 压缩发布版门禁
+
+`build-min.js --check` 在内存中生成压缩结果，编译生成脚本并与仓库中的
+`APPs/Weave.min.html` 逐字比较，不写文件。`min-smoke.js` 再验证压缩版启动、
+创建节点、创建连线与撤销。
+
+```bash
+cd test
+npm run test:min
 ```
 
 ### 画框分区专项测试
@@ -171,7 +188,7 @@ node test/check-structure.js              # 校验（无参数）
 - DOM id 集合与 golden 一致（104 个）
 - 常量区 / 尾部区（注释与空白归一化后）逐字一致
 - **App 条目逐条等价** —— 每个方法/状态字段的"名称 + 类型 + 归一化函数体"与 golden 逐一比对
-  （347 条 = 250 方法 + 97 状态字段）
+  （351 条 = 252 方法 + 99 状态字段）
 - `Weave.*` 命名空间成员逐条等价（41 个）
 
 golden.json 的 `movedOut` / `renames` 记录 Phase 2 从 App 提取到 `Weave.Util/Color/Geom`

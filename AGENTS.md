@@ -12,9 +12,9 @@
 
 ### 1. 始终保持为单 HTML 文件
 
-`APPs/Weave.html` 是 Weave 唯一的应用程序文件，严禁拆分为多文件结构。所有 HTML、CSS、JavaScript 必须内联在同一文件中。外部资源（如字体）从 CDN 加载，不引入本地文件依赖。
+`APPs/Weave.html` 是 Weave 主程序唯一的应用程序文件，严禁拆分为多文件结构。所有 HTML、CSS、JavaScript 必须内联在同一文件中。外部资源（如字体）从 CDN 加载，不引入本地文件依赖。
 
-同目录下 `APPs/Weave.min.html` 是 `test/build-min.js` 生成的压缩发布版，不手工编辑；同目录的其他 HTML 文件为独立的历史应用，与 Weave 无关。
+同目录下 `APPs/Weave.min.html` 是 `test/build-min.js` 生成的压缩发布版，不手工编辑；`APPs/Weave-recovery.html` 是独立的本地数据恢复工具，不属于主程序，不加载或渲染节点图，也不适用 M01–M13 模块化拼接规则。该文件由 `npm run test:recovery` 与 `test/i18n-recovery.js` 守护、有独立 I18N 词典（与主程序共用 `flow_lang`）、不生成压缩产物，但参与在线部署（站点根目录的 `recovery.html`）。同目录的其他 HTML 文件为独立的历史应用，与 Weave 无关。
 
 ### 2. 每次修改后必须测试
 

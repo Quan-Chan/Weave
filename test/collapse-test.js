@@ -39,6 +39,10 @@ const shot = async (page, name) => {
     "--user-data-dir=" + userDataDir,
     "about:blank"
   ], { stdio: ["ignore", "ignore", "ignore"] });
+  process.once("exit", () => {
+    try { edgeProc.kill(); } catch (e) {}
+    try { fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }); } catch (e) {}
+  });
   edgeProc.on("error", e => { console.log("edge spawn error: " + e.message); });
   const portFile = path.join(userDataDir, "DevToolsActivePort");
   const wsDeadline = Date.now() + 25000;
@@ -53,8 +57,8 @@ const shot = async (page, name) => {
   if (!wsUrl) { console.log("FAIL: no DevTools ws url"); process.exit(1); }
   const browser = await puppeteer.connect({ browserWSEndpoint: wsUrl, defaultViewport: { width: 1280, height: 800 }, protocolTimeout: 120000 });
   const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: "load" });
-  await page.waitForFunction("'!!window.App && !!document.getElementById(\"canvasStage\") && document.getElementById(\"canvasStage\").clientWidth > 0'", { timeout: 15000 });
+  await page.goto(APP_URL, { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
   await sleep(600);
   await page.keyboard.press("Escape");
   await sleep(200);

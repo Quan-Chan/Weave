@@ -46,9 +46,42 @@ async function launchBrowser(headed) {
       }
       if (!wsUrl) await sleep(200);
     }
-    if (!wsUrl) { try { edgeProc.kill(); } catch (_) {} throw new Error('无法连接 Edge DevTools'); }
-    const browser = await puppeteer.connect({ browserWSEndpoint: wsUrl, defaultViewport: { width: 1280, height: 800 }, protocolTimeout: 120000 });
-    return { browser, mode: 'spawn', cleanup: async () => { await browser.close(); try { edgeProc.kill(); } catch (_) {} await sleep(300); } };
+    const removeProfile = async () => {
+      for (let i = 0; i < 20; i++) {
+        try { fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 }); } catch (_) {}
+        if (!fs.existsSync(userDataDir)) return;
+        await sleep(250);
+      }
+    };
+    const stopEdge = async () => {
+      try { edgeProc.kill(); } catch (_) {}
+      for (let i = 0; i < 20 && edgeProc.exitCode === null && edgeProc.signalCode === null; i++) await sleep(100);
+      await removeProfile();
+    };
+    if (!wsUrl) {
+      await stopEdge();
+      throw new Error('无法连接 Edge DevTools');
+    }
+    let browser;
+    try {
+      browser = await puppeteer.connect({ browserWSEndpoint: wsUrl, defaultViewport: { width: 1280, height: 800 }, protocolTimeout: 120000 });
+    } catch (err) {
+      await stopEdge();
+      throw err;
+    }
+    let cleaned = false;
+    return {
+      browser,
+      mode: 'spawn',
+      cleanup: async () => {
+        if (cleaned) return;
+        cleaned = true;
+        try { await browser.close(); }
+        finally {
+          await stopEdge();
+        }
+      }
+    };
   }
 }
 
@@ -58,7 +91,8 @@ async function openApp(browser, { clearStorage = false } = {}) {
   if (clearStorage) {
     await page.evaluateOnNewDocument(() => { try { localStorage.clear(); } catch (e) {} });
   }
-  await page.goto(APP_URL, { waitUntil: 'load' });
+  page.setDefaultNavigationTimeout(60000);
+  await page.goto(APP_URL, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 25000 });
   await sleep(500);
   await page.keyboard.press('Escape');  // 关首启设置弹窗
