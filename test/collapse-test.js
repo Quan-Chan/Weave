@@ -4,20 +4,14 @@
 //       需求 3（嵌套收起 & 多父冲突禁止）、需求 4（悬停 ± 徽标）、
 //       需求 5（PNG 导出含收起呈现与 ± 徽标）。
 // 用法: node test/collapse-test.js [--headed]
-const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
-const { pathToFileURL } = require('url');
+const { sleep, launchBrowser, openApp, setupChain, mkNode } = require('./helpers/launch');
 
-// 浏览器可执行文件: 环境变量优先(CI), 缺省回退本机 Edge
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-// 应用地址: 相对定位仓库内文件(可移植)
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
 const SHOTS = path.join(__dirname, 'shots-collapse');
 fs.mkdirSync(SHOTS, { recursive: true });
 const HEADED = process.argv.includes('--headed');
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 let step = 0;
 const shot = async (page, name) => {
   step++;
@@ -28,55 +22,21 @@ const shot = async (page, name) => {
 };
 
 (async () => {
-  // Sandbox note: spawn Edge manually with stdio ignore (pipe stdio is denied);
-  // discover debug port from DevToolsActivePort, then puppeteer.connect.
-  const { spawn } = require("child_process");
-  const os = require("os");
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "weave-pup-"));
-  const edgeProc = spawn(EDGE, [
-    "--headless=new", "--no-sandbox", "--disable-gpu", "--no-first-run", "--window-size=1280,800",
-    "--remote-debugging-port=0",
-    "--user-data-dir=" + userDataDir,
-    "about:blank"
-  ], { stdio: ["ignore", "ignore", "ignore"] });
-  process.once("exit", () => {
-    try { edgeProc.kill(); } catch (e) {}
-    try { fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }); } catch (e) {}
-  });
-  edgeProc.on("error", e => { console.log("edge spawn error: " + e.message); });
-  const portFile = path.join(userDataDir, "DevToolsActivePort");
-  const wsDeadline = Date.now() + 25000;
-  let wsUrl = null;
-  while (Date.now() < wsDeadline && !wsUrl) {
-    if (fs.existsSync(portFile)) {
-      const pl = fs.readFileSync(portFile, "utf8").split(/\r?\n/).filter(Boolean);
-      if (pl.length >= 2) wsUrl = "ws://127.0.0.1:" + pl[0] + pl[1];
-    }
-    if (!wsUrl) await new Promise(r => setTimeout(r, 200));
-  }
-  if (!wsUrl) { console.log("FAIL: no DevTools ws url"); process.exit(1); }
-  const browser = await puppeteer.connect({ browserWSEndpoint: wsUrl, defaultViewport: { width: 1280, height: 800 }, protocolTimeout: 120000 });
-  const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: "load", timeout: 60000 });
-  await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(600);
-  await page.keyboard.press("Escape");
-  await sleep(200);
+  // 台架内含「launch 失败则 spawn + DevToolsActivePort + connect」的降级路径
+  // （受限环境的管道 stdio 被拒），以及统一的页面就绪等待与首启弹窗关闭。
+  const { browser, cleanup } = await launchBrowser(HEADED);
+  const { page, cdp } = await openApp(browser);
   const fail = (msg) => { throw new Error(msg); };
 
   // ── 布置：A → B → C 链 + D 旁支（B→D） ──
-  await page.evaluate(() => {
-    const mk = (label, x, y) => ({ id: 'x_' + label, label, desc: '', color: 'blue', x, y, mirrored: false, w: 170, h: 80 });
-    App.canvasState.nodes = [mk('A', 0, 0), mk('B', 320, 0), mk('C', 640, 0), mk('D', 480, 220)];
-    App.canvasState.connections = [
-      { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false },
-      { id: 'c_BC', from: 'x_B', to: 'x_C', label: '', mirrored: false },
-      { id: 'c_BD', from: 'x_B', to: 'x_D', label: '', mirrored: false }
-    ];
-    App._nodeZOrder = App.canvasState.nodes.map(n => n.id);
-    App.saveCanvasSnapshot();
-    App.renderCanvas();
-  });
+  await setupChain(page, [
+    mkNode('x_A', 'A', 0, 0), mkNode('x_B', 'B', 320, 0),
+    mkNode('x_C', 'C', 640, 0), mkNode('x_D', 'D', 480, 220)
+  ], [
+    { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false },
+    { id: 'c_BC', from: 'x_B', to: 'x_C', label: '', mirrored: false },
+    { id: 'c_BD', from: 'x_B', to: 'x_D', label: '', mirrored: false }
+  ]);
   await sleep(300);
   await page.evaluate(() => { App.centerCanvasOnNodes(); });
   await sleep(400);
@@ -394,8 +354,6 @@ const shot = async (page, name) => {
   await shot(page, '09_leaf_no_badge');
 
   console.log('ALL PASSED');
-  await browser.close();
-  try { edgeProc.kill(); } catch (e) {}
-  await sleep(300);
+  await cleanup();
   process.exit(0);
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

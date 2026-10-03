@@ -6,6 +6,10 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'">
 <title>Weave 恢复与设置</title>
 <style>
+/* ══ 分区导航（按 ══ 注释查找）══
+   1 页面与卡片 · 2 表单控件 · 3 状态与告警 · 4 宽屏与窄屏 */
+
+/*── 1 页面与卡片 ──*/
 :root{--bg:#f6f7f9;--card:#fff;--text:#17202a;--muted:#667085;--line:#dfe3e8;--blue:#2563eb;--blue-hover:#1d4ed8;--red:#b42318;--red-hover:#912018;--green:#067647;--green-bg:#ecfdf3;--amber-bg:#fffaeb;--amber-line:#fedf89;--amber-text:#93370d}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -22,11 +26,13 @@ h1{font-size:26px;line-height:1.25;margin:0 0 8px}h2{font-size:18px;margin:0 0 6
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
 .workspace{display:grid;grid-template-columns:400px minmax(0,1fr);gap:18px;align-items:start;margin-top:18px}
 .column{min-width:0}
+/*.left-column / .right-column 不设样式，供两栏并排的布局断言定位（test/recovery-tool-test.js）。*/
 .left-column{position:sticky;top:24px}
 .column>.card:last-child{margin-bottom:0}
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px}
-.settings-grid .setting{border-bottom:1px solid var(--line)}
-.settings-grid .setting:last-child{border-bottom:0;grid-column:1/-1}
+.settings-grid .setting:last-child{grid-column:1/-1}
+
+/*── 2 表单控件 ──*/
 .io-actions>button,.io-actions>.file-button{flex:1}
 button,.file-button{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer;min-height:40px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 button:hover,.file-button:hover{background:#f9fafb;border-color:#b8c0cc}
@@ -34,10 +40,16 @@ button.primary{background:var(--blue);border-color:var(--blue);color:#fff}button
 button.danger{background:var(--red);border-color:var(--red);color:#fff;font-weight:650}button.danger:hover{background:var(--red-hover)}
 button.wide{width:100%;font-size:16px;min-height:48px}
 button.small{min-height:34px;padding:6px 10px;font-size:13px}
-.file-button{background:#fff}
 .hint{color:var(--muted);font-size:13px;margin:10px 0 0}
+
+/*── 3 状态与告警 ──*/
 .status{display:none;margin-top:14px;border-radius:8px;padding:10px 12px;white-space:pre-wrap}.status.show{display:block}.status.ok{background:var(--green-bg);color:var(--green)}.status.err{background:#fef3f2;color:var(--red)}.status.info{background:#eff8ff;color:#175cd3}
 .alert{display:none;background:#fef3f2;border:1px solid #fda29b;color:var(--red);border-radius:9px;padding:11px 13px;margin:0 0 18px;white-space:pre-wrap}.alert.show{display:block}
+/*告警条带关闭按钮：告警由 storage 事件与清空复检写入，不关会一直挂到刷新。*/
+.alert-head{display:flex;align-items:flex-start;gap:12px}
+.alert-text{flex:1;min-width:0}
+.alert-close{flex:0 0 auto;min-height:28px;padding:2px 9px;font-size:13px;line-height:1.2;background:#fff;border-color:#fda29b;color:var(--red)}
+.alert-close:hover{background:#fff5f4;border-color:var(--red)}
 .setting{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 0;border-bottom:1px solid var(--line)}
 .setting:last-child{border-bottom:0}.setting-copy{min-width:0}.setting-title{font-weight:650}.setting-desc{color:var(--muted);font-size:13px;margin-top:2px}
 .switch{position:relative;flex:0 0 auto;width:44px;height:25px}
@@ -46,13 +58,14 @@ button.small{min-height:34px;padding:6px 10px;font-size:13px}
 .switch input:checked+.track{background:var(--blue)}.switch input:checked+.track+.thumb{transform:translateX(19px)}
 .langs{display:flex;gap:8px;min-width:0}.langs button{padding:8px 9px;min-width:0;white-space:nowrap}.langs button.active{background:#eff8ff;border-color:#84caff;color:#175cd3}
 input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;width:100%;max-width:190px;min-width:96px;background:#fff}
-.value-state{color:var(--muted);font-size:13px}
 .keybind-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:28px}
 .keybind-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
 .keybind-row:nth-last-child(-n+2){border-bottom:0}
 .key-capture{min-width:112px;font-family:Consolas,"SFMono-Regular",monospace;justify-content:center}
 .key-capture.recording{border-color:var(--blue);background:#eff8ff;color:#175cd3}
 .footer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+
+/*── 4 宽屏与窄屏 ──*/
 @media(max-width:960px){.page{max-width:760px}.workspace{grid-template-columns:1fr}.settings-grid,.keybind-grid{grid-template-columns:1fr}.keybind-row:nth-last-child(2){border-bottom:1px solid var(--line)}.left-column{position:static}}
 @media(max-width:620px){.page{padding:24px 12px 48px}.card{padding:16px}.storage{grid-template-columns:repeat(3,1fr);gap:6px}.size{padding:8px}.size strong{font-size:15px;white-space:nowrap}.size span{font-size:12px}.setting{align-items:flex-start}.actions button,.actions .file-button{flex:1 1 100%}input[type=text]{width:100%}}
 </style>
@@ -63,7 +76,7 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
   <p class="lead" data-i18n="page.lead">显示本地数据占用，调整 Weave 设置，清空节点图。</p>
 
   <div class="notice" data-i18n="page.notice">执行清空、导入或键位修改前关闭全部 Weave 页面。未关闭的页面可能覆盖已保存的数据。</div>
-  <div id="pageAlert" class="alert"></div>
+  <div id="pageAlert" class="alert"><div class="alert-head"><span id="pageAlertText" class="alert-text"></span><button id="btnDismissAlert" class="alert-close" type="button" data-i18n="page.dismiss">关闭</button></div></div>
 
   <section class="card">
     <h2 data-i18n="storage.title">本地数据占用</h2>
@@ -179,8 +192,16 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
 </main>
 
 <script>
+/* ══ 分区导航（按 ══ 注释查找）══
+   1 键与默认值 · 2 界面词典 · 3 取值与提示 · 4 设置 · 5 键位 ·
+   6 节点图数据 · 7 装配与启动
+   本页是独立工具，不适用主程序的 M01–M13 模块化拼接；分区仅供定位。
+   与主程序共享的只有 localStorage 的 flow_* 键与存档格式，两处各维护一份，
+   键位默认表由 test/recovery-tool-test.js 与主程序逐项比对。*/
 (function(){
   'use strict';
+
+  /*── 1 键与默认值 ──*/
   var DATA_KEY='flow_data';
   var BOOL_DEFAULTS={flow_snap_nodes:'1',flow_snap_size:'1',flow_snap_region_pos:'1',flow_snap_region_size:'1',flow_auto_modal:'0',flow_hide_ui:'0',flow_help_seen:'0'};
   var KEYBIND_DEFAULTS={
@@ -197,17 +218,32 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
   };
   //动作 → 键位名称的翻译键；冲突提示与键位行标签都由此取文案。
   var KEYBIND_ACTIONS=[['undo','key.undo'],['redo','key.redo'],['selectAll','key.selectAll'],['copy','key.copy'],['paste','key.paste'],['autoModal','key.autoModal'],['chrome','key.chrome'],['region','key.region'],['hlNode','key.hlNode'],['delete','key.delete']];
-  var SETTING_KEYS=Object.keys(BOOL_DEFAULTS).concat(['flow_gen_color','flow_lang','flow_keybinds','flow_custom_colors']);
+  //本页读写的主程序存储键。与主程序 App._settings 的 key 逐项对应，
+  //一致性由 test/recovery-tool-test.js 守护。定义须在 SETTING_KEYS 之前：
+  //var 提升只提升声明，取值仍按执行顺序。
+  var KEY_LANG='flow_lang';
+  var KEY_GEN_COLOR='flow_gen_color';
+  var KEY_KEYBINDS='flow_keybinds';
+  var KEY_CUSTOM_COLORS='flow_custom_colors';
+  var SETTING_KEYS=Object.keys(BOOL_DEFAULTS).concat([KEY_GEN_COLOR,KEY_LANG,KEY_KEYBINDS,KEY_CUSTOM_COLORS]);
+  //自选颜色的预设名。与主程序 PRESET_COLORS 的 id 一致，用于校验新节点颜色。
+  var PRESET_COLORS=['blue','cyan','green','yellow','orange'];
+  var RE_HEX6=/^#[0-9a-fA-F]{6}$/;
+  //4 项对齐设置键：主程序对齐设置（常规页开关）与本页"重置对齐设置"共用同一批。
+  var ALIGN_KEYS=['flow_snap_nodes','flow_snap_size','flow_snap_region_pos','flow_snap_region_size'];
   var storageOK=false;
   var keybinds=null;
   var keybindEditing=null;
   var keybindDataError=false;
   var IS_MAC=/Mac|iPhone|iPad|iPod/.test(navigator.platform||navigator.userAgent);
-  //界面词典。语言代码与 localStorage 的 flow_lang 一致，因此本页与主程序共用同一个语言开关。
+
+  /*── 2 界面词典 ──*/
+  //语言代码与 localStorage 的 flow_lang 一致，因此本页与主程序共用同一个语言开关。
   var I18N={
     zh:{
       'page.title':'Weave 恢复与设置','page.lead':'显示本地数据占用，调整 Weave 设置，清空节点图。',
       'page.notice':'执行清空、导入或键位修改前关闭全部 Weave 页面。未关闭的页面可能覆盖已保存的数据。',
+      'page.dismiss':'关闭',
       'storage.title':'本地数据占用','storage.hint':'显示已保存数据的字符数，按千进制换算为 B、KB、MB。本页不解析已保存的节点图数据。',
       'storage.graph':'节点图数据','storage.settings':'软件设置','storage.total':'数据合计',
       'storage.refresh':'刷新大小','storage.openWeave':'打开 Weave',
@@ -229,7 +265,8 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       'io.rejectConns':'connections 必须是数组','io.rejectRegions':'regions 必须是数组',
       'io.rejectViewport':'viewport 必须是对象',
       'io.confirm':'将用 {name} 替换当前节点图。\n\n确定继续吗？','io.canceled':'已取消导入。',
-      'io.written':'节点图数据已写入。',
+      'io.written':'节点图数据已写入。','io.writtenVerifyFailed':'导入写入了主程序无法加载的条目，写入已回滚。',
+      'io.rejectNodeItem':'nodes 第 {index} 项不是对象','io.rejectConnItem':'connections 第 {index} 项不是对象','io.rejectRegionItem':'regions 第 {index} 项不是对象',
       'io.writeFailed':'导入失败：{name} — {msg}\n当前节点图数据保持不变。',
       'io.verifyFailed':'写入校验失败','io.readFileFailed':'文件读取失败：{msg}',
       'io.keybindFormat':'键位数据格式错误','settings.opFailed':'操作失败：{msg}',
@@ -237,9 +274,9 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       'settings.title':'软件设置','settings.hint':'开关和语言按钮修改后保存。新节点颜色在输入框失焦后保存。',
       'settings.saved':'设置已保存。','settings.saveFailed':'保存失败：{msg}',
       'settings.resetAlign':'重置对齐设置','settings.resetAll':'重置全部设置',
-      'settings.langSaved':'语言设置已保存。','settings.colorSaved':'新节点颜色已保存。',
+      'settings.langSaved':'语言设置已保存。','settings.colorSaved':'新节点颜色已保存。','settings.colorInvalid':'颜色格式无效：请填 blue / cyan / green / yellow / orange 或 #RRGGBB。',
       'settings.resetAlignDone':'对齐设置已重置为默认值。','settings.resetAllDone':'全部设置已重置为默认值。',
-      'settings.colorsCleared':'已清除自选颜色。','settings.resetFailed':'操作失败：{msg}',
+      'settings.colorsCleared':'已清除自选颜色。',
       'set.snapNodes':'对齐节点','set.snapNodesDesc':'节点位置对齐到网格；关闭后自由摆放',
       'set.snapSize':'节点大小对齐','set.snapSizeDesc':'节点大小对齐到网格；关闭后自由调整',
       'set.snapRegionPos':'分区位置对齐网格','set.snapRegionPosDesc':'分区框位置对齐到网格；关闭后自由摆放',
@@ -267,6 +304,7 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
     en:{
       'page.title':'Weave Recovery & Settings','page.lead':'Review local data usage, adjust Weave settings, clear the graph.',
       'page.notice':'Close all Weave pages before clearing, importing, or editing keybindings. Open pages may overwrite saved data.',
+      'page.dismiss':'Dismiss',
       'storage.title':'Local data usage','storage.hint':'Character count of saved data, converted to B, KB, and MB with decimal units. This page does not parse the saved graph.',
       'storage.graph':'Graph data','storage.settings':'Software settings','storage.total':'Total',
       'storage.refresh':'Refresh sizes','storage.openWeave':'Open Weave',
@@ -288,7 +326,8 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       'io.rejectConns':'connections must be an array','io.rejectRegions':'regions must be an array',
       'io.rejectViewport':'viewport must be an object',
       'io.confirm':'{name} will replace the current graph.\n\nContinue?','io.canceled':'Import canceled.',
-      'io.written':'Graph data written.',
+      'io.written':'Graph data written.','io.writtenVerifyFailed':'The import wrote entries the app cannot load; the write was rolled back.',
+      'io.rejectNodeItem':'nodes item {index} is not an object','io.rejectConnItem':'connections item {index} is not an object','io.rejectRegionItem':'regions item {index} is not an object',
       'io.writeFailed':'Import failed: {name} - {msg}\nThe current graph data is unchanged.',
       'io.verifyFailed':'write verification failed','io.readFileFailed':'Failed to read file: {msg}',
       'io.keybindFormat':'keybinding data is malformed','settings.opFailed':'Operation failed: {msg}',
@@ -296,9 +335,9 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       'settings.title':'Software settings','settings.hint':'Switches and language buttons save immediately. New node color saves on blur.',
       'settings.saved':'Settings saved.','settings.saveFailed':'Save failed: {msg}',
       'settings.resetAlign':'Reset alignment','settings.resetAll':'Reset all settings',
-      'settings.langSaved':'Language setting saved.','settings.colorSaved':'New node color saved.',
+      'settings.langSaved':'Language setting saved.','settings.colorSaved':'New node color saved.','settings.colorInvalid':'Invalid color: use blue / cyan / green / yellow / orange or #RRGGBB.',
       'settings.resetAlignDone':'Alignment settings reset to defaults.','settings.resetAllDone':'All settings reset to defaults.',
-      'settings.colorsCleared':'Custom colors cleared.','settings.resetFailed':'Operation failed: {msg}',
+      'settings.colorsCleared':'Custom colors cleared.',
       'set.snapNodes':'Snap nodes','set.snapNodesDesc':'Snap node positions to the grid; off allows free placement',
       'set.snapSize':'Snap node size','set.snapSizeDesc':'Snap node sizes to the grid; off allows free resizing',
       'set.snapRegionPos':'Snap region position','set.snapRegionPosDesc':'Snap region positions to the grid; off allows free placement',
@@ -325,19 +364,50 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
     }
   };
   var lang='zh';
+
+  /*── 3 取值与提示 ──*/
+  //缺键回退顺序与主程序一致：当前语言 → en → zh → 键名。
   function t(key,params){
-    var s=(I18N[lang]&&I18N[lang][key])||(I18N.zh[key])||key;
+    var s=(I18N[lang]&&I18N[lang][key])||(I18N.en&&I18N.en[key])||(I18N.zh&&I18N.zh[key])||key;
     if(params)for(var k in params)s=s.split('{'+k+'}').join(params[k]);
     return s;
   }
-  //重刷全部 data-i18n 静态文本并同步 <html lang>（切语言时调用）。
+  //写一个键并回读校验。成功返回 null；失败恢复原值并返回错误对象——
+  //调用方需要区分「写入本身失败」与「写后回读不符」时看 err.verifyFailed。
+  //四处写入（设置、键位、键位重置、导入）共用这一条路径。
+  function writeValue(key,raw){
+    var previous=readValue(key);
+    var writeError=null;
+    try{
+      localStorage.setItem(key,raw);
+      if(localStorage.getItem(key)===raw)return null;
+    }catch(e){writeError=e;}
+    //走到这里说明写入抛错或回读不符：恢复原值。
+    try{
+      if(previous===null)localStorage.removeItem(key);
+      else localStorage.setItem(key,previous);
+    }catch(e2){/* 恢复也失败：调用方按原错误报错 */}
+    return { verifyFailed:!writeError, error:writeError };
+  }
+  //重刷全部 data-i18n 静态文本、标签页标题与 <html lang>（切语言时调用）。
   function applyLang(){
     document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'));});
+    document.title=t('page.title');
     document.documentElement.lang=lang==='zh'?'zh-CN':lang;
   }
   function $(id){return document.getElementById(id);}
   function status(id,text,type){var e=$(id);e.textContent=text||'';e.className='status'+(text?' show '+(type||'info'):'');}
-  function pageAlert(text){var e=$('pageAlert');e.textContent=text||'';e.className='alert'+(text?' show':'');}
+  //告警条：写入后由关闭按钮或下一次成功操作清除，不常驻到刷新。
+  function pageAlert(text){var e=$('pageAlert');$('pageAlertText').textContent=text||'';e.className='alert'+(text?' show':'');}
+  //来源声明：本页只作用于当前来源那一份数据，文案随语言与来源变化。
+  function renderSource(){
+    var isFile=location.protocol==='file:';
+    $('sourceInfo').textContent=isFile?t('storage.sourceFile'):t('storage.sourceSite',{host:location.host});
+    $('sourceInfo').title=location.href;
+    $('openWeave').href=isFile?'Weave.html':'./index.html';
+  }
+  //语言变化后的统一重刷：两个入口（页内按钮、storage 事件）共用。
+  function refreshAfterLangChange(){applyLang();renderSource();loadSettings();renderKeybinds();}
   function sizeLabel(n){if(n===0)return'0 B';if(n<1000)return n+' B';if(n<1000000)return(n/1000).toFixed(1)+' KB';return(n/1000000).toFixed(2)+' MB';}
   function readValue(key){try{return localStorage.getItem(key);}catch(e){return null;}}
   function refreshSizes(){
@@ -358,22 +428,38 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       status('storageStatus',graph?t('storage.saved'):t('storage.empty'),'info');
     }catch(e){status('storageStatus',t('storage.readFailed',{msg:e.message}),'err');}
   }
+  /*── 4 设置 ──*/
+  //按存储值回填 7 个开关、语言高亮与新节点颜色。逐项走 readValue（已包
+  //try/catch），因此在无法访问存储的环境中也应调用：开关没有 HTML checked，
+  //跳过会让"默认开启"的对齐项显示为关闭。
   function loadSettings(){
     document.querySelectorAll('[data-bool]').forEach(function(input){
       var key=input.getAttribute('data-bool');
       var value=readValue(key);
       input.checked=value===null?BOOL_DEFAULTS[key]==='1':value==='1';
     });
-    document.querySelectorAll('[data-lang]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-lang')===lang);});
-    $('genColor').value=readValue('flow_gen_color')||'blue';
+    var savedLang=readValue(KEY_LANG);
+    document.querySelectorAll('[data-lang]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-lang')===savedLang);});
+    $('genColor').value=readValue(KEY_GEN_COLOR)||'blue';
   }
+  function saveSetting(key,value,message){
+    var err=writeValue(key,value);
+    if(!err){
+      status('settingsStatus',message||t('settings.saved'),'ok');
+      refreshSizes();
+    }else{
+      status('settingsStatus',t('settings.saveFailed',{msg:err.error?err.error.message:t('io.verifyFailed')}),'err');
+    }
+  }
+
+  /*── 5 键位 ──*/
   function cloneKeybindDefaults(){
     return JSON.parse(JSON.stringify(KEYBIND_DEFAULTS));
   }
   function loadKeybinds(){
     keybinds=cloneKeybindDefaults();
     keybindDataError=false;
-    var saved=readValue('flow_keybinds');
+    var saved=readValue(KEY_KEYBINDS);
     if(!saved)return;
     try{
       var parsed=JSON.parse(saved);
@@ -450,20 +536,17 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
     if(conflict){cancelKeybindEdit(t('keys.dup',{name:t(conflict[1])}));return;}
     var previous=keybinds[action];
     keybinds[action]=combo;
-    try{
-      var raw=JSON.stringify(keybinds);
-      localStorage.setItem('flow_keybinds',raw);
-      if(localStorage.getItem('flow_keybinds')!==raw)throw new Error(t('io.verifyFailed'));
+    if(writeValue(KEY_KEYBINDS,JSON.stringify(keybinds))===null){
       var button=document.querySelector('.key-capture[data-kb="'+action+'"]');
       button.textContent=keybindLabel(combo);
       button.classList.remove('recording');
       stopKeybindCapture();
       status('keybindStatus',t('keys.saved'),'ok');
       refreshSizes();
-    }catch(e){
+    }else{
       keybinds[action]=previous;
       renderKeybinds();
-      cancelKeybindEdit(t('keys.saveFailed',{msg:e.message}));
+      cancelKeybindEdit(t('keys.saveFailed',{msg:t('io.verifyFailed')}));
     }
   }
   function startKeybindEdit(action,button){
@@ -508,24 +591,22 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
   function resetKeybinds(){
     if(!confirm(t('keys.confirmReset')))return;
     cancelKeybindEdit();
-    try{
-      localStorage.setItem('flow_keybinds','');
+    if(writeValue(KEY_KEYBINDS,'')===null){
       keybinds=cloneKeybindDefaults();
       keybindDataError=false;
       renderKeybinds();
       status('keybindStatus',t('keys.resetDone'),'ok');
       refreshSizes();
-    }catch(e){status('keybindStatus',t('keys.resetFailed',{msg:e.message}),'err');}
+    }else{status('keybindStatus',t('keys.resetFailed',{msg:t('io.verifyFailed')}),'err');}
   }
-  function saveSetting(key,value,message){
-    try{localStorage.setItem(key,value);loadSettings();refreshSizes();status('settingsStatus',message||t('settings.saved'),'ok');}
-    catch(e){status('settingsStatus',t('settings.saveFailed',{msg:e.message}),'err');}
-  }
+
+  /*── 6 节点图数据 ──*/
   function clearGraph(){
     if(!storageOK)return;
     if(!confirm(t('graph.confirm')))return;
     try{
       localStorage.removeItem(DATA_KEY);
+      pageAlert('');
       status('graphStatus',t('graph.cleared'),'ok');
       refreshSizes();
       scheduleCheck();
@@ -536,15 +617,30 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       try{
         var raw=localStorage.getItem(DATA_KEY);
         if(raw){pageAlert(t('graph.rewritten'));refreshSizes();}
-      }catch(e){}
+      }catch(e){/* 存储不可用：占用区已由 refreshSizes 报错 */}
     },1200);
   }
+  //导入的受理门。集合级校验与主程序 _prepareSerializedData 一致；另加条目级
+  //校验：主程序 _validateLoadedData 会丢弃非对象的节点/连线/分区条目，若在此
+  //放行会写入"导入成功但画布空白"的数据。
   function strictReject(data){
     if(data===null||typeof data!=='object'||Array.isArray(data))return t('io.rejectTop');
     if(!Array.isArray(data.nodes))return t('io.rejectNodes');
     if(data.connections!==undefined&&!Array.isArray(data.connections))return t('io.rejectConns');
     if(data.regions!==undefined&&!Array.isArray(data.regions))return t('io.rejectRegions');
     if(data.viewport!==undefined&&data.viewport!==null&&(typeof data.viewport!=='object'||Array.isArray(data.viewport)))return t('io.rejectViewport');
+    var badItem=findBadItem(data.nodes,'io.rejectNodeItem')||
+                findBadItem(data.connections,'io.rejectConnItem')||
+                findBadItem(data.regions,'io.rejectRegionItem');
+    if(badItem)return badItem;
+    return null;
+  }
+  function findBadItem(list,key){
+    if(!Array.isArray(list))return null;
+    for(var i=0;i<list.length;i++){
+      var item=list[i];
+      if(item===null||typeof item!=='object'||Array.isArray(item))return t(key,{index:i+1});
+    }
     return null;
   }
   function importGraph(file){
@@ -557,12 +653,20 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
       if(reject){status('ioStatus',t('io.invalid',{reason:reject}),'err');return;}
       if(!confirm(t('io.confirm',{name:file.name}))){status('ioStatus',t('io.canceled'),'info');return;}
       var compact=JSON.stringify(data);
-      try{
-        localStorage.setItem(DATA_KEY,compact);
-        if(localStorage.getItem(DATA_KEY)!==compact)throw new Error(t('io.verifyFailed'));
+      //writeValue 负责写后回读与失败回滚；据 verifyFailed 分出两种提示：
+      //写入本身失败（如配额不足）与写入成功但回读不符（已回滚）。
+      var err=writeValue(DATA_KEY,compact);
+      if(!err){
+        pageAlert('');
         status('ioStatus',t('io.written'),'ok');
         refreshSizes();
-      }catch(e){status('ioStatus',t('io.writeFailed',{name:e.name||'Error',msg:e.message}),'err');}
+        //仍打开的 Weave 页面可能把内存中的节点图写回，覆盖刚导入的数据。
+        scheduleCheck();
+      }else if(err.verifyFailed){
+        status('ioStatus',t('io.writtenVerifyFailed'),'err');
+      }else{
+        status('ioStatus',t('io.writeFailed',{name:err.error.name||'Error',msg:err.error.message}),'err');
+      }
     }).catch(function(e){status('ioStatus',t('io.readFileFailed',{msg:e.message}),'err');});
   }
   function exportGraph(){
@@ -579,7 +683,7 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
     if(!confirm(t('settings.confirmPrefix')+label+t('settings.confirmSuffix')))return;
     try{
       keys.forEach(function(k){
-        if(k==='flow_keybinds')localStorage.setItem(k,'');
+        if(k===KEY_KEYBINDS)localStorage.setItem(k,'');
         else localStorage.removeItem(k);
       });
       cancelKeybindEdit();
@@ -591,18 +695,26 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
     }
     catch(e){status('settingsStatus',t('settings.opFailed',{msg:e.message}),'err');}
   }
+  function resetCustomColors(){resetKeys([KEY_CUSTOM_COLORS],t('set.clearColors'),t('settings.colorsCleared'));}
+  function resetAlignSettings(){resetKeys(ALIGN_KEYS,t('settings.resetAlign'),t('settings.resetAlignDone'));}
+  function resetAllSettings(){resetKeys(SETTING_KEYS,t('settings.resetAll'),t('settings.resetAllDone'));}
+  //新节点颜色：只受理主程序认识的取值（5 个预设名或 #RRGGBB），
+  //否则主程序会静默回退蓝色，而本页显示"已保存"。
+  function saveGenColor(){
+    var v=$('genColor').value.trim();
+    if(!v)return;
+    if(!PRESET_COLORS.includes(v)&&!RE_HEX6.test(v)){status('settingsStatus',t('settings.colorInvalid'),'err');return;}
+    saveSetting(KEY_GEN_COLOR,v,t('settings.colorSaved'));
+  }
+
+  /*── 7 装配与启动 ──*/
   function init(){
-    //本页的全部操作只作用于当前来源对应的那一份数据。浏览器按来源隔离存储区，
-    //file: 与 http(s): 互不可见，页面无法跨来源读写，来源不同则声明文案不同。
-    var isFile=location.protocol==='file:';
     //语言与主程序共用 flow_lang：在本页切换语言，主程序下次打开即为同一语言。
-    lang=I18N[readValue('flow_lang')]?readValue('flow_lang'):'zh';
+    var savedLang=readValue(KEY_LANG);
+    lang=I18N[savedLang]?savedLang:'zh';
+    //来源声明与 data-i18n 文案都依赖当前语言，必须先于其余初始化设定。
     applyLang();
-    $('sourceInfo').textContent=isFile
-      ?t('storage.sourceFile')
-      :t('storage.sourceSite',{host:location.host});
-    $('sourceInfo').title=location.href;
-    $('openWeave').href=isFile?'Weave.html':'./index.html';
+    renderSource();
     try{
       localStorage.setItem('__weave_recovery_probe__','1');localStorage.removeItem('__weave_recovery_probe__');
       storageOK=true;
@@ -619,46 +731,34 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
         var next=button.getAttribute('data-lang');
         if(!I18N[next])return;
         lang=next;
-        applyLang();
-        $('sourceInfo').textContent=isFile
-          ?t('storage.sourceFile')
-          :t('storage.sourceSite',{host:location.host});
-        loadSettings();
-        renderKeybinds();
-        saveSetting('flow_lang',next,t('settings.langSaved'));
+        refreshAfterLangChange();
+        saveSetting(KEY_LANG,next,t('settings.langSaved'));
       });
     });
-    $('genColor').addEventListener('change',function(){var v=$('genColor').value.trim();if(!v)return;saveSetting('flow_gen_color',v,t('settings.colorSaved'));});
-    $('btnRefresh').onclick=refreshSizes;
-    $('btnClearGraph').onclick=clearGraph;
-    $('graphFile').onchange=function(){importGraph(this.files&&this.files[0]);this.value='';};
-    $('btnExportGraph').onclick=exportGraph;
+    $('genColor').addEventListener('change',saveGenColor);
+    $('btnDismissAlert').addEventListener('click',function(){pageAlert('');});
+    $('btnRefresh').addEventListener('click',function(){refreshSizes();});
+    $('btnClearGraph').addEventListener('click',function(){clearGraph();});
+    $('graphFile').addEventListener('change',function(){importGraph(this.files&&this.files[0]);this.value='';});
+    $('btnExportGraph').addEventListener('click',function(){exportGraph();});
     document.querySelectorAll('.key-capture').forEach(function(button){
       button.addEventListener('click',function(){
         this.blur();
         startKeybindEdit(this.getAttribute('data-kb'),this);
       });
     });
-    $('btnResetKeys').onclick=resetKeybinds;
-    $('btnClearColors').onclick=function(){resetKeys(['flow_custom_colors'],t('set.clearColors'),t('settings.colorsCleared'));};
-    $('btnResetAlign').onclick=function(){resetKeys(['flow_snap_nodes','flow_snap_size','flow_snap_region_pos','flow_snap_region_size'],t('settings.resetAlign'),t('settings.resetAlignDone'));};
-    $('btnResetAll').onclick=function(){resetKeys(SETTING_KEYS,t('settings.resetAll'),t('settings.resetAllDone'));};
+    $('btnResetKeys').addEventListener('click',function(){resetKeybinds();});
+    $('btnClearColors').addEventListener('click',resetCustomColors);
+    $('btnResetAlign').addEventListener('click',resetAlignSettings);
+    $('btnResetAll').addEventListener('click',resetAllSettings);
     window.addEventListener('storage',function(e){
       if(e.key===DATA_KEY){pageAlert(t('graph.modifiedElsewhere'));refreshSizes();}
-      if(e.key==='flow_lang'){
-        var next=readValue('flow_lang');
-        if(I18N[next]&&next!==lang){
-          lang=next;
-          applyLang();
-          $('sourceInfo').textContent=isFile
-            ?t('storage.sourceFile')
-            :t('storage.sourceSite',{host:location.host});
-          loadSettings();
-          renderKeybinds();
-        }
+      if(e.key===KEY_LANG){
+        var next=readValue(KEY_LANG);
+        if(I18N[next]&&next!==lang){lang=next;refreshAfterLangChange();}
         refreshSizes();
       }
-      if(e.key==='flow_keybinds'){
+      if(e.key===KEY_KEYBINDS){
         cancelKeybindEdit();
         loadKeybinds();
         renderKeybinds();
@@ -668,7 +768,10 @@ input[type=text]{border:1px solid var(--line);border-radius:7px;padding:8px 10px
     });
     loadKeybinds();
     renderKeybinds();
-    if(storageOK){loadSettings();refreshSizes();}
+    //loadSettings 逐项走 readValue（已包 try/catch），存储不可用时也要执行，
+    //否则开关停在 HTML 的无 checked 状态，把"默认开启"的对齐项显示成关闭。
+    loadSettings();
+    if(storageOK)refreshSizes();
   }
   init();
 })();

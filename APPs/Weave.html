@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- viewport-fit=cover：配合 CSS 的 env(safe-area-inset-*) 让顶栏/侧边栏避开刘海与圆角。
+     不加 maximum-scale / user-scalable=no——保留用户缩放能力（无障碍要求）；
+     画布内的手势由 touch-action:none 与 M08 的指针层自行处理。 -->
 <title>Weave</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,7 +15,8 @@
 /* ══ CSS 1 · 基础样式 ══
    分区导航（按 ══ CSS n · 注释查找）
      1 基础与变量（:root/按钮/节点/连线/浮层）· 2 可调整大小节点 ·
-     3 模态家族（含自定义色轮/关于/设置/色点）· 4 生成色下拉 */
+     3 模态家族（含自定义色轮/关于/设置/色点）· 4 生成色下拉 ·
+     5 触控与响应式 */
 :root {
   --bg-page: #f0f2f5; --bg-card: #ffffff; --bg-hover: #eef0f4; --bg-input: #f5f6f8;
   --border: #dde0e5; --border-light: #c8ccd3;
@@ -195,9 +199,10 @@ stroke-width 过渡：缩放时它会让线宽滞后于几何 150ms 造成粗细
 /*分区创建预览（屏幕坐标 overlay）：粗线 + 浅填充，与 .sel-overlay 的虚线框选区分。
   颜色由 _applyRegionPreviewColor 按顶栏生成色以内联样式写入；此处为初始值。*/
 .region-preview{position:absolute;border:2px solid var(--accent);background:rgba(59,130,246,.07);pointer-events:none;z-index:100}
-/*分区创建模式（Region 键 / 顶栏按钮）下的画布光标提示*/
-.canvas.region-mode{cursor:crosshair}
-.canvas.region-mode.grabbing{cursor:default}
+/*画布模式开关（Region 键 / 侧边栏「分区」「框选」按钮）下的光标提示：
+   开启模式后画布空白处为十字，实际拖拽（.grabbing）期间回落为默认。*/
+.canvas.region-mode,.canvas.box-mode{cursor:crosshair}
+.canvas.region-mode.grabbing,.canvas.box-mode.grabbing{cursor:default}
 .curve-overlay{position:absolute;top:0;left:0;overflow:visible;pointer-events:none;z-index:100}
 .canvas.drag-over{background:var(--accent-bg);outline:3px dashed var(--accent);outline-offset:-3px}
 .canvas.read-only{cursor:default}
@@ -243,6 +248,14 @@ stroke-width 过渡：缩放时它会让线宽滞后于几何 150ms 造成粗细
 .node-clear:hover{background:rgba(231,76,60,.12);color:#e74c3c}
 .node-body.has-overflow::after{display:none}
 .node-body.has-overflow .node-val::after{content:'…';position:absolute;left:calc(100% - var(--ellipsis-slot));bottom:0;font-size:11px;line-height:1.35;color:var(--text-primary);background:transparent;padding:0 2px;pointer-events:none}
+
+/*── 刘海屏 / 圆角屏安全区避让（配合 viewport-fit=cover）──
+   安全区为 0（无刘海）时取到 0，水平内边距仍是 .header / .sidebar 基础规则
+   的 24px 与 12px。侧边栏竖排贴左右边缘、窄屏转顶部横条后贴底边，故四项
+   安全区都写。须位于 CSS 5 的断点之前：断点用 padding 简写覆盖内边距，
+   同特异性下由源序决定胜负，放到后面会让断点的内边距失效。*/
+.header{padding-inline:max(24px, env(safe-area-inset-left), env(safe-area-inset-right))}
+.sidebar{padding-inline:env(safe-area-inset-left) env(safe-area-inset-right);padding-block:12px env(safe-area-inset-bottom)}
 
 /* ══ CSS 2 · 可调整大小节点 ══ */
 /*统一的可调整大小节点
@@ -332,9 +345,12 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
 /*── 模态家族（共享遮罩/弹窗/按钮；各模态仅 z-index 不同）──*/
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .modal-overlay.on{display:flex}
+/*弹窗 z-index 一律显式写出：缺省（auto）会让遮罩排在顶栏（z-index:100）之下，
+遮罩顶部一条点不到——点空白关闭与按钮点击都会失效。*/
 #modal{z-index:300}
 #cpModal{z-index:400}
 #settingsModal{z-index:350}
+#regionModal{z-index:360}
 .modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;width:340px;box-shadow:var(--shadow-lg);transform:scale(1.25);transform-origin:center center}
 .modal-box h3{font-size:14px;font-weight:600;margin-bottom:14px}
 .modal-box button{padding:5px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);transition:.15s}
@@ -433,14 +449,18 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
 /* ══ 设置弹窗（左侧导航 + 右侧内容）与键位框 ══
    键位设置：功能说明居左、键位框居右；键盘快捷键可点击自定义；
    键位显示按平台（Mac → Cmd，其余 → Ctrl） */
-#settingsModalBox{width:600px}
+#settingsModalBox{width:min(600px,94vw);max-height:92vh}
 .settings-body{display:flex;gap:16px;margin:6px 0 16px;height:420px}
 .settings-nav{width:128px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--border);padding-right:12px}
 .settings-nav-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:none;background:transparent;font-family:inherit;font-size:13px;color:var(--text-secondary);cursor:pointer;text-align:left;transition:background .12s ease,color .12s ease}
 .settings-nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
 .settings-nav-item.active{background:var(--accent-bg);color:var(--accent);font-weight:600}
 .settings-nav-item:last-child{margin-top:auto}
-.settings-panels{flex:1;min-width:0}
+/*min-height:0 不可省：面板是 flex 项，默认 min-height:auto 使其无法收缩到
+  内容高度以下——设置弹窗改纵向排布后，flex:1 作用在垂直轴，面板会被
+  28 行内容撑到近千像素并冲破 .settings-body 的固定高度。有了它，
+  面板才在既定高度内滚动。*/
+.settings-panels{flex:1;min-width:0;min-height:0}
 .settings-panel{height:100%;overflow-y:auto;padding-right:4px}
 .settings-panel::-webkit-scrollbar{width:8px}.settings-panel::-webkit-scrollbar-thumb{background:rgba(128,128,128,.22);border-radius:4px;border:2px solid transparent;background-clip:content-box}
 .set-keys{padding:0 2px}
@@ -460,6 +480,116 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
 .lang-btn{padding:5px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);transition:.15s}
 .lang-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
 .lang-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ══ CSS 5 · 触控与响应式 ══
+   触控的呈现层（手势判定在 M08 · _initPointerEvents，基于 Pointer Events）：
+   画布接管、命中区放大、窄屏布局。
+   1 触控基线 · 2 触控命中区 · 3 响应式（含安全区避让，规则位于 CSS 1） */
+
+/*── 1 触控基线 ──*/
+/*画布接管全部指针手势：不接管的话，浏览器会自行滚动（单指）、
+ 捏合缩放与双击缩放（双指/双击），手势全部失效。范围仅限画布——
+ 顶栏与弹窗保留浏览器默认的滚动与缩放。*/
+.canvas{touch-action:none}
+/*触屏点按的系统高亮灰块一律去掉，点击反馈交由 .btn:active 等既有态承担。*/
+body{-webkit-tap-highlight-color:transparent}
+
+/*── 2 触控命中区 ──*/
+/*触控模式（body.touch，由 _initPointerEvents 在首次触控 pointerdown 时置位）把细小的
+ 命中目标扩到手指可点尺寸。扩法是叠加透明的 ::before 覆盖层而非放大元素本身：
+ 命中区变大，视觉尺寸不变，节点外观与鼠标端保持一致。*/
+body.touch .socket::before{content:'';position:absolute;left:-11px;right:-11px;top:-11px;bottom:-11px}
+body.touch .node .rsz-handle::before{content:'';position:absolute;left:-12px;right:-12px;top:-12px;bottom:-12px}
+/*上下文菜单项：11px 字号 + 6px 内边距在触屏下过小。*/
+body.touch #ctx button{padding:11px 12px;font-size:13px}
+body.touch #ctx{min-width:150px}
+
+/*── 3 响应式 ──
+   断点按"可用空间"取，不只看宽度：手机横屏的宽度常大于 820
+   （iPhone 16 Pro Max 横屏为 956×440），只按宽度设断点会让整段移动端
+   规则失效——弹窗按桌面尺寸渲染，再被 .modal-box 的 transform:scale(1.25)
+   放大，在 440 高的屏幕上上下双向出屏。故对"窄"与"矮"分别设断点，
+   矮屏段专门兼顾横屏。*/
+
+/*窄屏（平板竖屏 / 手机竖屏）：顶栏换行，命中区放大，弹窗近全屏 */
+@media (max-width:820px){
+  .header{height:auto;flex-wrap:wrap;padding:8px 12px;gap:8px;row-gap:8px}
+  .btn-group{flex-wrap:wrap;gap:8px;row-gap:8px}
+  .btn-group .sep{display:none}
+  .btn-secondary,.g-trigger-btn{padding:10px 14px}
+  .header-badge{order:3}
+  .modal-box{width:min(94vw,420px);overflow:auto;transform:none}
+  .settings-box{height:min(88vh,640px)}
+  .settings-body{flex-direction:column}
+  .settings-nav{width:100%;flex-shrink:1;flex-direction:row;flex-wrap:wrap;border-right:none;border-bottom:1px solid var(--border);padding:0 0 8px;gap:8px}
+  .settings-nav-item{flex:1 1 auto;text-align:center;justify-content:center;padding:9px 8px}
+  .settings-nav-item:last-child{margin-top:0}
+  .sidebar{width:60px}
+  .sidebar-btn{width:44px;height:44px}
+  .sidebar-btn svg{width:20px;height:20px}
+  .coord{font-size:11px;padding:4px 7px}
+  .toast{max-width:calc(100vw - 32px);font-size:14px}
+  /*键位值可换行：.key-value 的 flex-shrink:0 使它以 max-content 为基准，
+    只改 white-space 不会换行，窄屏下键位表仍会横向溢出。*/
+  .key-value{white-space:normal;flex-shrink:1;min-width:0}
+}
+
+/*矮屏（任何宽度）：垂直空间一紧张就收。手机横屏、多分屏、缩小的桌面
+   窗口都命中这一段——单靠 max-width 断点会全部漏掉。*/
+@media (max-height:620px){
+  /*关掉弹窗的入场放大：scale(1.25) 会让视觉尺寸超出 max-height 的限制，
+    在矮屏上必然出屏。*/
+  .modal-box{max-height:92vh;overflow:auto;transform:none;padding:14px}
+  .modal-box h3{margin-bottom:8px}
+  /*设置弹窗改为纵向自适应：body 填满剩余高度，面板在其内滚动，
+    不再依赖固定的 420px。*/
+  #settingsModalBox{width:min(600px,94vw);height:min(520px,92vh);max-height:92vh;display:flex;flex-direction:column}
+  #settingsModalBox h3,#settingsBtns{flex-shrink:0}
+  .settings-body{flex:1;min-height:0;height:auto;margin:4px 0 8px;gap:10px}
+  /*顶栏压成单行，按钮过多时横向滚动，不与画布抢高度*/
+  .header{height:48px;flex-wrap:nowrap;padding:0 12px;gap:10px}
+  .btn-group{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .btn-group::-webkit-scrollbar{display:none}
+  .btn-group .btn{flex-shrink:0}
+  .btn-secondary,.g-trigger-btn{padding:6px 12px}
+  .header-badge{order:0;flex-shrink:0}
+  /*窄屏规则里的"侧边栏转横条"在横屏不适用，这里恢复为右侧竖排*/
+  .canvas-wrap{flex-direction:row}
+  .sidebar{width:48px;height:auto;flex-direction:column;border-left:1px solid var(--border);border-bottom:none;padding:8px 0}
+}
+
+/*超矮屏（手机横屏）：进一步压缩，把高度让给画布与弹窗内容 */
+@media (max-height:480px){
+  .header{height:42px;padding:0 10px}
+  .sidebar{width:42px}
+  .settings-nav{width:96px;padding-right:8px}
+  .settings-nav-item{padding:6px 8px;font-size:12px}
+  .key-row{padding:3px 6px}
+  .set-sub{margin:8px 0 4px}
+  .modal-box{padding:12px}
+  .modal-box h3{font-size:13px;margin-bottom:6px}
+}
+
+/*横屏且空间充裕（平板横屏 / 桌面）：侧边栏与顶栏维持常规模型，
+   仅把弹窗宽度放宽到可用范围。显式写出 orientation 分支是为了让
+   横屏有一处确定的落点——否则手机横屏只会命中上面的 max-height 段。*/
+@media (orientation:landscape) and (min-height:481px){
+  #settingsModalBox{width:min(720px,94vw)}
+}
+
+/*极窄屏（手机竖屏）：侧边栏收成顶部横条，把宽度还给画布；
+ 顶栏的按钮在此宽度会挤成多行、吃掉三成屏幕，故一并压缩字号与内边距。*/
+@media (max-width:520px){
+  .canvas-wrap{flex-direction:column-reverse}
+  .sidebar{width:100%;height:56px;flex-direction:row;justify-content:center;border-left:none;border-bottom:1px solid var(--border);padding:0 8px}
+  .sidebar-bottom{margin-top:0;flex-direction:row}
+  .header{padding:6px 8px;gap:6px;row-gap:6px}
+  .btn-group{gap:6px;row-gap:6px}
+  .btn-secondary,.g-trigger-btn{padding:7px 10px;font-size:11px}
+  .header-brand{font-size:13px}
+  .header-brand svg{width:22px;height:22px}
+  .header-badge{font-size:10px;padding:3px 8px}
+}
 
 </style>
 </head>
@@ -486,8 +616,6 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
       <button class="btn btn-secondary" id="btnAddNode" data-i18n="btn.addNode">+ 节点</button>
       <button class="btn btn-secondary" id="btnClearAllNodes" data-i18n="btn.clear" data-i18n-title="btn.clearTitle" title="清除所有节点">清空</button>
       <span class="sep"></span>
-      <button class="btn btn-secondary" id="btnRegion" data-i18n="btn.region" data-i18n-title="btn.regionTitle" title="画框分区（Shift+R，Alt+拖拽）">分区</button>
-      <span class="sep"></span>
       <button class="btn btn-secondary" id="btnDoExport" data-i18n="btn.export">导出</button>
       <button class="btn btn-secondary" id="btnDoImport" data-i18n="btn.import">导入</button>
       <span class="sep"></span>
@@ -503,6 +631,11 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
     <div class="sidebar" id="sidebar">
       <button class="sidebar-btn" id="btnExportPNG" data-i18n-title="btn.exportPng" title="导出PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
       <button class="sidebar-btn" id="sidebarReadOnlyBtn" data-i18n-title="btn.readonly" title="只读模式"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+      <button class="sidebar-btn" id="btnMultiSelect" data-i18n-title="btn.multiSelect" title="多选模式"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="4 3"/><path d="M7.9 12.3l2.9 2.9 5.6-6.2"/></svg></button>
+      <!-- 分区与框选是画布模式开关而非主功能，放在侧边栏；与只读 / 多选模式
+           共用同一套 active 反馈，开启后画布光标同步变为十字 -->
+      <button class="sidebar-btn" id="btnRegion" data-i18n-title="btn.regionTitle" title="画框分区（Shift+R，Alt+拖拽）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><rect x="7" y="8.5" width="4.6" height="4.6" rx="1.1" fill="currentColor" stroke="none"/><rect x="12.4" y="12.9" width="4.6" height="4.6" rx="1.1" fill="currentColor" stroke="none"/></svg></button>
+      <button class="sidebar-btn" id="btnBox" data-i18n-title="btn.boxTitle" title="框选模式（触控：单指拖拽即框选）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.8V6a2 2 0 0 1 2-2h2.8M15.2 4H18a2 2 0 0 1 2 2v2.8M20 15.2V18a2 2 0 0 1-2 2h-2.8M8.8 20H6a2 2 0 0 1-2-2v-2.8"/></svg></button>
       <div class="sidebar-bottom">
         <button class="sidebar-btn" id="btnShowSettings" data-i18n-title="btn.settings" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       </div>
@@ -520,6 +653,8 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
 <div id="ctx">
   <button id="ctxEdit" data-i18n="ctx.edit">编辑</button>
   <button id="ctxDup" data-i18n="ctx.dup">复制</button>
+  <!-- 多选累加 / 关联高亮经侧边栏「多选模式」按钮与 Alt 单击，此处不设入口 -->
+  <button id="ctxHl" data-i18n="ctx.hl">高亮关联节点</button>
   <div class="sep2" id="ctxSep1"></div>
   <button id="ctxMirror" data-i18n="ctx.mirror">镜像节点</button>
   <div class="sep2" id="ctxSepMirror"></div>
@@ -536,6 +671,13 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
   <div class="sep2" id="ctxSepDanger"></div>
   <button class="del" id="ctxResetSize" data-i18n="ctx.resetSize">重置节点大小</button>
   <button class="del" id="ctxDel" data-i18n="ctx.del">删除</button>
+  <!-- 画布菜单：空白处长按弹出（触控版的右键）。补齐无键盘时的
+       粘贴（Ctrl+V）、全选（Ctrl+A）与框选模式入口。 -->
+  <div class="sep2" id="ctxSepCanvas"></div>
+  <button id="ctxPaste" data-i18n="ctx.paste">粘贴</button>
+  <button id="ctxSelectAll" data-i18n="ctx.selectAll">全选</button>
+  <button id="ctxBoxMode" data-i18n="ctx.boxMode">框选模式</button>
+  <button id="ctxFit" data-i18n="ctx.fit">适应视图</button>
 </div>
 
 <!-- ══ HTML 4 · 模态家族（节点详情 / 自定义颜色 / 关于 / 设置）══ -->
@@ -644,6 +786,15 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
             <div class="key-row"><span class="key-desc" data-i18n="set.middle">无交互移动画布</span><span class="key-value" data-i18n="set.kv.middle">中键拖拽 / 长按中键</span></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.wheel">缩放画布</span><span class="key-value" data-i18n="set.kv.wheel">滚轮</span></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.colorCycle">切换节点颜色</span><span class="key-value" data-i18n="set.kv.colorCycle">Ctrl + 滚轮</span></div>
+            <div class="set-sub" data-i18n="set.touchTitle">触控操作</div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tTap">选中 / 取消选中</span><span class="key-value" data-i18n="set.kv.tap">点按节点</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tDbl">生成新节点 / 编辑节点文字</span><span class="key-value" data-i18n="set.kv.dbl">双击空白处 / 双击节点文字</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tLong">更多操作（等同右键）</span><span class="key-value" data-i18n="set.kv.long">长按节点 / 连线 / 空白处</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tDrag">移动节点 / 移动画布 / 创建连线</span><span class="key-value" data-i18n="set.kv.drag1">单指拖拽</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tPinch">缩放并平移画布</span><span class="key-value" data-i18n="set.kv.pinch">双指捏合</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tBox">框选多个节点</span><span class="key-value" data-i18n="set.kv.boxMode">开启侧边栏「框选」后拖拽空白处</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tMulti">累加选中多个节点</span><span class="key-value" data-i18n="set.kv.multiMode">开启侧边栏「多选模式」后点按节点</span></div>
+            <div class="key-row"><span class="key-desc" data-i18n="set.tRegion">框出一个区域</span><span class="key-value" data-i18n="set.kv.regionMode">开启侧边栏「分区」后拖拽空白处</span></div>
             <div class="set-sub" data-i18n="set.keyTitle">键盘快捷键</div>
             <div class="key-row"><span class="key-desc" data-i18n="set.undo">撤销</span><input class="help-key" type="text" data-kb="undo" value="Ctrl+Z" readonly></div>
             <div class="key-row"><span class="key-desc" data-i18n="set.redo">重做</span><input class="help-key" type="text" data-kb="redo" value="Ctrl+Y" readonly></div>
@@ -662,7 +813,7 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.3.1</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v1.4</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -708,15 +859,15 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
      M05 渲染·节点      —— 节点 DOM 创建/更新、renderCanvas 编排、z 序、溢出刷新、关联高亮模糊
      M06 渲染·连线      —— 贝塞尔几何、箭头、SVG 渲染、空间索引、增量平移、分区渲染
      M07 动画           —— 网格吸附动画（240Hz 数据流 + rAF 渲染流）
-     M08 输入手势       —— 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射、分区手势、文件拖拽导入
-     M09 节点编辑       —— CRUD、剪贴板、内联编辑、描述浮层、详情弹窗、上下文菜单动作、收起/展开节点串
+     M08 输入手势       —— 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射、分区手势、文件拖拽导入、指针手势（触控/触控笔）
+     M09 节点编辑       —— CRUD、剪贴板、内联编辑、描述浮层、详情弹窗、上下文菜单动作、收起/展开节点串、分区编辑
      M10 连线编辑       —— 创建/删除、曲线手柄、标签编辑、选择维护
      M11 UI 外壳        —— 右键菜单、关于/设置弹窗、键位录制、专注模式、状态徽标、Σ 彩蛋
      M12 导入导出       —— JSON 导入导出、PNG 导出（DOM 快照 + legacy 双通道）
      M13 装配与启动     —— 全局事件监听、快捷键、Init 初始化
 
     画框分区（region）
-     - 交互入口：顶栏 分区 按钮 / Region 键（默认 Shift+R）/ Alt+左键拖拽（画布空白处）
+     - 交互入口：侧边栏 分区 按钮 / Region 键（默认 Shift+R）/ Alt+左键拖拽（画布空白处）
      - 新建时包含框内节点，并把它们选中；分区属性（名称/颜色）经右键菜单与弹窗编辑
      - 分区渲染 = SVG rect（随画布变换），坐标 x/y/w/h 均为世界像素，序列化同节点规则
 
@@ -759,6 +910,14 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
         在 _onCanvasClick 顶部按序消费，语义互不相同（框选后 / 内联拖选后 / 节点拖拽后）
       - 拖拽预览把鼠标光标虚拟为配对连接点（与真实节点同构），复用永久连线几何
       - 任意时刻至多一个指向性手势处于活动态（节点拖 / 线拖 / 框选 / 平移 / 曲线手柄）
+      - 触控不另写手势实现：_bindDragListeners 同时接管 pointermove/up，
+        _touchFire 补发同构鼠标事件——既有手势代码只读 clientX/clientY 与
+        修饰键，对事件类型无假设。pointerType==='mouse' 放行给既有鼠标
+        处理器，touch/pen 进入指针层，故同一物理输入不会被处理两遍。
+      - 指针捕获：按下即 setPointerCapture，拖拽在手指滑出画布后不中断。
+      - 仅空白画布一路（平移/框选/分区预览，驱动在 M13 尾部 document
+        mousemove，不经 _bindDragListeners）需由 _ptrMove 补发 mousemove；
+        其余手势各自已接管 pointermove，补发会造成重复位移。
 
    模块编码规范（改架构时请同步本注释与 test/golden.json）
      1. App 方法一律用简写 method(){} 定义在模块的 Object.assign 块中，禁止箭头函数
@@ -812,6 +971,34 @@ const SOCKET_HIT_RADIUS = 14;
 //在输出连接点上触发收起/展开切换；超过该值按拖拽建线处理（历史行为）。
 const SOCKET_CLICK_TOLERANCE = 4;
 
+// ── 触控手势阈值（屏幕像素 / 毫秒）──
+// 触控没有 hover 与右键，全部操作经手势翻译回既有鼠标语义（M08）。
+// 下列阈值决定单指触摸在"点击 / 拖拽 / 长按"之间的分界，
+// 三者共用同一次 touchstart：位移先到 → 拖拽；按住不动 → 长按；
+// 抬手且前两者都没发生 → 点击。
+/*长按判定时长：按住不动达此值弹出上下文菜单（触控版的"右键"）。*/
+const TOUCH_LONGPRESS_MS = 500;
+/*拖拽起判位移（屏幕像素）：单指位移超过它即从"点击候选"转为真实拖拽。*/
+const TOUCH_DRAG_SLOP = 10;
+/*双击判定窗口与位移容差（屏幕像素）：两次点击间隔 ≤ 窗口、
+ 位置相距 ≤ 容差，判为双击（触控版的"双击"，触屏不派发 dblclick）。*/
+const TOUCH_DOUBLE_MS = 320;
+const TOUCH_DOUBLE_SLOP = 28;
+/*捏合起判的两指最小间距（屏幕像素）：低于它视为手指尚未分开。*/
+const TOUCH_PINCH_MIN_DIST = 24;
+/*触控建线的连线测试半径倍数：手指精度低于鼠标，
+ 连接点视觉半径 8px 在触屏下过小，放大命中半径而不改视觉尺寸。*/
+const TOUCH_SOCKET_RADIUS_SCALE = 1.8;
+/*判定"浏览器补发 click"的时间阈值（毫秒）：长按弹出菜单后，若某个 click
+ 前面 150ms 内没有任何 pointerdown，它就不是用户点的，而是浏览器为"抬起
+  手指"补发的——必须拦下，否则会落到长按菜单的某一项上。*/
+const TOUCH_STRAY_CLICK_MS = 150;
+/*长按菜单的保护窗口（毫秒）：菜单弹出后的这段时间内按上一条阈值甄别补发 click。*/
+const TOUCH_CTX_GUARD_MS = 500;
+/*触摸之后悬停提示的静默窗口（毫秒）：触摸点选会引来浏览器补发的 mouseover，
+ 窗口内的悬停提示一律不弹，混合设备上的真实鼠标悬停不受影响。*/
+const TOUCH_HOVER_SILENCE_MS = 700;
+
 const WORLD_CENTER_X = 0;
 const WORLD_CENTER_Y = 0;
 const START_Y = WORLD_CENTER_Y - 60;
@@ -851,13 +1038,18 @@ const I18N = {
     'btn.clearTitle': '清除所有节点',
     'btn.exportPng': '导出PNG', 'btn.readonly': '只读模式', 'btn.settings': '设置',
     'btn.colorGen': '选择生成节点颜色', 'btn.colorWheel': '自选颜色', 'btn.color': '颜色',
-    'btn.region': '分区', 'btn.regionTitle': '画框分区（Shift+R，Alt+拖拽）',
+    'btn.regionTitle': '画框分区（Shift+R，Alt+拖拽）',
+    'btn.boxTitle': '框选模式（触控：单指拖拽即框选）',
+    'btn.multiSelect': '多选模式',
     // 右键菜单
     'ctx.edit': '编辑', 'ctx.dup': '复制', 'ctx.mirror': '镜像节点', 'ctx.props': '属性',
     'ctx.resize': '调整节点大小', 'ctx.curve': '调整连线曲线', 'ctx.resetCurve': '重置曲线控制点',
     'ctx.resetSize': '重置节点大小', 'ctx.del': '删除',
     'ctx.regionMove': '移动分区框', 'ctx.regionResize': '调整分区框大小',
     'ctx.editLabel': '编辑文字', 'ctx.editDesc': '编辑描述',
+    // 触控菜单项（替代无修饰键的 Ctrl / Alt 单击与无键盘的 Ctrl+V / Ctrl+A）
+    'ctx.hl': '高亮关联节点',
+    'ctx.paste': '粘贴', 'ctx.selectAll': '全选', 'ctx.boxMode': '框选模式', 'ctx.fit': '适应视图',
     // 节点详情弹窗
     'modal.editTitle': '编辑节点', 'modal.label': '标签', 'modal.desc': '描述', 'modal.color': '颜色',
     'modal.regionTitle': '编辑分区', 'modal.regionLabel': '分区名称', 'modal.regionColor': '分区颜色',
@@ -889,6 +1081,16 @@ const I18N = {
     'set.hlNode': '高亮关联节点',
     'set.middle': '无交互移动画布',
     'set.wheel': '缩放画布', 'set.colorCycle': '切换节点颜色',
+    // 设置 · 触控操作（触屏无修饰键与右键，以下为触控对应的手势）
+    'set.touchTitle': '触控操作',
+    'set.tTap': '选中 / 取消选中', 'set.kv.tap': '点按节点',
+    'set.tDbl': '生成新节点 / 编辑节点文字', 'set.kv.dbl': '双击空白处 / 双击节点文字',
+    'set.tLong': '更多操作（等同右键）', 'set.kv.long': '长按节点 / 连线 / 空白处',
+    'set.tDrag': '移动节点 / 移动画布 / 创建连线', 'set.kv.drag1': '单指拖拽',
+    'set.tPinch': '缩放并平移画布', 'set.kv.pinch': '双指捏合',
+    'set.tBox': '框选多个节点', 'set.kv.boxMode': '开启侧边栏「框选」后拖拽空白处',
+    'set.tMulti': '累加选中多个节点', 'set.kv.multiMode': '开启侧边栏「多选模式」后点按节点',
+    'set.tRegion': '框出一个区域', 'set.kv.regionMode': '开启侧边栏「分区」后拖拽空白处',
     'set.undo': '撤销', 'set.redo': '重做', 'set.selectAll': '全选',
     'set.copy': '复制', 'set.paste': '粘贴', 'set.autoModal': '新建自动打开详情',
     'set.chrome': '隐藏 / 显示界面', 'set.delKey': '删除选中',
@@ -908,6 +1110,8 @@ const I18N = {
     'toast.fileReadFailed': '读取文件失败', 'toast.storageSaveFailed': '自动保存失败，请导出 JSON 备份',
     'toast.regionCreated': '已创建分区', 'toast.regionDeleted': '分区已删除',
     'toast.regionModeOn': '分区模式已开启：拖拽画布空白处画分区', 'toast.regionModeOff': '分区模式已关闭',
+    'toast.boxModeOn': '框选模式已开启：拖拽画布空白处框选', 'toast.boxModeOff': '框选模式已关闭',
+    'toast.multiSelectOn': '多选模式已开启：点按节点可累加选中', 'toast.multiSelectOff': '多选模式已关闭',
     'toast.noData': '无数据可导出', 'toast.exported': '已导出',
     'toast.compatMode': '当前浏览器不支持 DOM 快照导出，已切换至兼容模式',
     'toast.tooBig': '画布过大，无法导出', 'toast.hugeExport': '超大图导出，可能需要一些时间',
@@ -938,13 +1142,17 @@ const I18N = {
     'btn.clearTitle': 'Clear all nodes',
     'btn.exportPng': 'Export PNG', 'btn.readonly': 'Read-only', 'btn.settings': 'Settings',
     'btn.colorGen': 'Color for new nodes', 'btn.colorWheel': 'Custom color', 'btn.color': 'Color',
-    'btn.region': 'Region', 'btn.regionTitle': 'Draw a region (Shift+R, Alt+drag)',
+    'btn.regionTitle': 'Draw a region (Shift+R, Alt+drag)',
+    'btn.boxTitle': 'Box-select mode (touch: one-finger drag)',
+    'btn.multiSelect': 'Multi-select mode',
     // 右键菜单
     'ctx.edit': 'Edit', 'ctx.dup': 'Duplicate', 'ctx.mirror': 'Mirror node', 'ctx.props': 'Properties',
     'ctx.resize': 'Resize node', 'ctx.curve': 'Adjust curve', 'ctx.resetCurve': 'Reset control points',
     'ctx.resetSize': 'Reset size', 'ctx.del': 'Delete',
     'ctx.regionMove': 'Move region frame', 'ctx.regionResize': 'Resize region frame',
     'ctx.editLabel': 'Edit label', 'ctx.editDesc': 'Edit description',
+    'ctx.hl': 'Highlight related',
+    'ctx.paste': 'Paste', 'ctx.selectAll': 'Select all', 'ctx.boxMode': 'Box-select mode', 'ctx.fit': 'Fit view',
     'modal.editTitle': 'Edit node', 'modal.label': 'Label', 'modal.desc': 'Description', 'modal.color': 'Color',
     'modal.regionTitle': 'Edit region', 'modal.regionLabel': 'Region name', 'modal.regionColor': 'Region color',
     'modal.cancel': 'Cancel', 'modal.save': 'Save', 'modal.customColor': 'Custom color', 'modal.confirm': 'OK',
@@ -974,6 +1182,16 @@ const I18N = {
     'set.hlNode': 'to highlight linked nodes',
     'set.middle': 'to pan without interacting',
     'set.wheel': 'to zoom', 'set.colorCycle': 'to cycle node colors',
+    // Settings · touch gestures
+    'set.touchTitle': 'Touch',
+    'set.tTap': 'to select / deselect', 'set.kv.tap': 'Tap a node',
+    'set.tDbl': 'to add a node / edit node text', 'set.kv.dbl': 'Double-tap empty canvas / node text',
+    'set.tLong': 'for more actions (same as right-click)', 'set.kv.long': 'Long-press node / connection / empty canvas',
+    'set.tDrag': 'to move nodes / pan / draw connections', 'set.kv.drag1': 'One-finger drag',
+    'set.tPinch': 'to zoom and pan', 'set.kv.pinch': 'Two-finger pinch',
+    'set.tBox': 'to box-select nodes', 'set.kv.boxMode': 'Drag empty canvas with sidebar Box mode on',
+    'set.tMulti': 'to add nodes to the selection', 'set.kv.multiMode': 'Tap nodes with sidebar Multi-select mode on',
+    'set.tRegion': 'to draw a region', 'set.kv.regionMode': 'Drag empty canvas with sidebar Region mode on',
     'set.undo': 'Undo', 'set.redo': 'Redo', 'set.selectAll': 'Select all',
     'set.copy': 'Copy', 'set.paste': 'Paste', 'set.autoModal': 'Auto-open details for new nodes',
     'set.chrome': 'Toggle UI chrome', 'set.delKey': 'Delete selection',
@@ -992,6 +1210,8 @@ const I18N = {
     'toast.fileReadFailed': 'Failed to read file', 'toast.storageSaveFailed': 'Auto-save failed. Export a JSON backup',
     'toast.regionCreated': 'Region created', 'toast.regionDeleted': 'Region deleted',
     'toast.regionModeOn': 'Region mode on: drag empty canvas to draw', 'toast.regionModeOff': 'Region mode off',
+    'toast.boxModeOn': 'Box-select mode on: drag empty canvas to select', 'toast.boxModeOff': 'Box-select mode off',
+    'toast.multiSelectOn': 'Multi-select mode on: tap nodes to add to selection', 'toast.multiSelectOff': 'Multi-select mode off',
     'toast.noData': 'Nothing to export', 'toast.exported': 'Exported',
     'toast.compatMode': 'DOM snapshot export unsupported — switched to compatibility mode',
     'toast.tooBig': 'Canvas too large to export', 'toast.hugeExport': 'Very large export — this may take a while',
@@ -1557,6 +1777,40 @@ const App = window.App = {
   //分区创建模式：Region 键切换。开启时画布空白处左键拖拽 = 画分区
   //（Alt+左键在任意状态下等效）。瞬态状态，不随存档保存。
   _regionModeActive: false,
+  //框选模式：触控端 Shift+拖拽的替代开关（与 _regionModeActive 同构）。
+  //开启后画布单指拖拽即框选。瞬态状态，不随存档保存。
+  _boxModeActive: false,
+  //多选模式：开启后点按节点累加/移出选中而非单选替换，拖动画布不清除
+  //选中，单击空白画布仍取消。与 Ctrl+单击同语义但无需修饰键。
+  //瞬态状态，不随存档保存。
+  _multiSelectMode: false,
+  //多选模式下"按下—松手"之间的待定点按：记下该节点按下时是否已在选中集合内，
+  //供松手时区分点按（是则移出）与拖拽（不动选中）。见 startNodeDrag。
+  _multiTap: null,
+  //触控手势状态（M08 · 指针手势）。首次真实触摸后 _touchMode 置位并
+  //常驻，据此放大连接点命中半径与启用触控命中区样式。
+  _touchMode: false,
+  //在途单指手势：pointerId / target / 起点 / 上一点 / 位移与长按标记。
+  //null = 无在途单指。捏合期间的收尾标记 _touchIgnore 为"余指不再起手"。
+  _touch: null,
+  //在途的触控指针位置表 {pointerId: {x, y}}，捏合取前两枚求中点与间距。
+  _ptrLive: null,
+  //在途双指捏合：起始间距、起始缩放与上一帧中点。null = 无在途捏合。
+  _touchPinch: null,
+  _touchIgnore: false,
+  //最近一次触摸的时间戳：悬停提示据此在触摸后的补发 mouseover 上静默，
+  //混合设备（触屏 + 鼠标）上的真实悬停不受影响。
+  _touchRecent: 0,
+  //上一次点击的时间与位置：窗口内的第二次点击判为双击（触屏不派发 dblclick）。
+  _touchLastTap: null,
+  //长按弹出右键菜单后的保护窗（时间戳）：窗内、没有前置 pointerdown 的
+  // click 视为浏览器为"抬手"补发，拦下。由 _touchLongPress 置位，
+  //由 M13 尾部的关闭处理器消费。
+  _ctxGuardUntil: 0,
+  //最近一次真实 pointerdown 的时间戳（画布内与画布外都记，菜单在画布之外）：
+  //用于区分"用户点的菜单项"与"浏览器补发的 click"。document 级捕获监听，
+  //由 _initPointerEvents 登记。
+  _lastPointerDownAt: 0,
   //分区创建结束后置 1 个 tick：随后的画布单击不得清除刚选中的节点。
   _regionJustCreated: false,
   //未选中分区上按下放行给画布平移时：发生过实际位移（拖动背景）→ true，
@@ -2042,6 +2296,9 @@ Object.assign(App, {
     this._regionModeActive = on;
     const stage = this._getEl('canvasStage');
     if (stage) stage.classList.toggle('region-mode', on);
+    //模式开关与只读 / 多选模式同处侧边栏，共用 active 反馈
+    const btn = this._getEl('btnRegion');
+    if (btn) btn.classList.toggle('active', on);
   },
   //状态徽标（左下角 "N 节点 · M 连线"）——调用于切语言、
   //渲染收尾与启动初始化。
@@ -4451,7 +4708,7 @@ Object.assign(App, {
 });
 
 /* ══ M08 · 输入手势 ───────────────────────────────────────────────────
-   职责: 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射、分区手势、文件拖拽导入
+   职责: 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射、分区手势、文件拖拽导入、指针手势（触控/触控笔）
    依赖: M02, M04
    ────────────────────────────────────────────────────────────────── */
 
@@ -4459,13 +4716,36 @@ Object.assign(App, {
   //统一的文档级拖拽手势绑定器：在 document 上绑定 mousemove/mouseup，
   //并以 window 的 blur 事件作为回退（在窗口外释放会结束
   //手势，而不是泄漏监听器）。返回一个清理函数。
+  //同时绑定 pointermove/pointerup：这是触控与触控笔拖拽的落点。
+  //既有手势实现（节点拖拽 / socket 建线 / 调整手柄 / 分区移动）只读
+  //事件上的 clientX/clientY，对事件类型无假设，因此把指针事件归一为
+  //同构的 {clientX, clientY} 后，同一套实现即可服务鼠标与触控，
+  //不存在两套拖拽代码。
+  //pointer 分支必须过滤 pointerType === 'mouse'：真实鼠标的同一次物理
+  //移动会同时派发 mousemove 与 pointermove，不过滤会被应用两遍。
+  //无坐标的事件（blur）原样透传，由既有代码判定"不算点击"。
   _bindDragListeners(onMove, onUp) {
+    const ptrMove = e => {
+      if (!this._isTouchPointer(e)) return;
+      if (e.cancelable) e.preventDefault();
+      onMove({ clientX: e.clientX, clientY: e.clientY });
+    };
+    const ptrUp = e => {
+      if (!this._isTouchPointer(e)) return;
+      onUp({ clientX: e.clientX, clientY: e.clientY });
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', ptrMove, { passive: false });
+    document.addEventListener('pointerup', ptrUp);
+    document.addEventListener('pointercancel', ptrUp);
     window.addEventListener('blur', onUp);
     return () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', ptrMove);
+      document.removeEventListener('pointerup', ptrUp);
+      document.removeEventListener('pointercancel', ptrUp);
       window.removeEventListener('blur', onUp);
     };
   },
@@ -4504,7 +4784,9 @@ Object.assign(App, {
       //（preventDefault 阻止了浏览器的自动滚动）。左键还会
       //清除连线选中（与空白处单击的行为一致）。
       if (e.button === 1) e.preventDefault();
-      if (e.button === 0) this._clearConnSelection();
+      //多选模式：平移画布不应清除选中（连线同理）。无位移的空白单击仍经
+      //_onCanvasClick 照常清除——"拖不清、点得清"。
+      if (e.button === 0 && !this._multiSelectMode) this._clearConnSelection();
       this._refreshContainerCache();
       this.canvasPanState = { startX: e.clientX, startY: e.clientY, origPanX: this.panX, origPanY: this.panY };
       container.classList.add('grabbing');
@@ -4982,6 +5264,9 @@ Object.assign(App, {
     const container = this._getEl('canvasStage');
     if (!nodesContainer || !container) return;
 
+    //指针手势层（触控 / 触控笔，与鼠标层并存，互不干扰）
+    this._initPointerEvents();
+
     if (!nodesContainer.dataset.ctxBound) {
       nodesContainer.dataset.ctxBound = '1';
       nodesContainer.addEventListener('contextmenu', function(e) {
@@ -4999,6 +5284,11 @@ Object.assign(App, {
       let _tipTimer;
       const _tip = this._getEl('nodeTip');
       nodesContainer.addEventListener('mouseover', function(e) {
+        //触控模式：悬停提示没有对应手势（点按是选中，不是探查），
+        //且触摸后浏览器补发的 mouseover 会让每次点选都弹出提示并挡住画布。
+        //按"刚发生过触摸"判定而非永久开关——触屏笔记本等混合设备上，
+        //真实鼠标悬停仍应照常弹出提示。
+        if (Date.now() - (App._touchRecent || 0) < TOUCH_HOVER_SILENCE_MS) return;
         const val = e.target.closest('.node-val');
         if (!val) return;
         const body = val.closest('.node-body');
@@ -5192,7 +5482,17 @@ Object.assign(App, {
       return;
     }
 
-    if (!this.selectedNodeIds.has(nodeId)) this.selectedNodeIds.clear();
+    //多选模式：点按节点即累加/移出选中（与 Ctrl+单击同语义），按下后照常
+    //进入拖拽。语义要分清"点"与"拖"：未选中的节点按下即加入选中，此后
+    //拖拽即整组拖动；已选中的节点按下时保持选中，只有最终确认是点按
+    //（无位移）才移出。否则"选中几个再拖其中一个"会在按下瞬间被取消选中
+    //而退化成单节点拖动。
+    if (this._multiSelectMode) {
+      this._multiTap = { nodeId: nodeId, wasSelected: this.selectedNodeIds.has(nodeId) };
+      if (!this._multiTap.wasSelected) this.selectedNodeIds.add(nodeId);
+    } else if (!this.selectedNodeIds.has(nodeId)) {
+      this.selectedNodeIds.clear();
+    }
     //抓取节点时分区选中随之让位（region 与节点选择互斥）。
     this._clearRegionSelection();
 
@@ -5292,13 +5592,27 @@ Object.assign(App, {
       self._bringToFront(self.dragState && self.dragState.nodes);
       //单击时选中节点（没有实际的拖拽移动）
       if (!self._dragActuallyMoved && self.dragState && self.dragState.nodes.length >= 1) {
-        self.selectedNodeIds.clear();
-        self.selectedNodeIds.add(self.dragState.nodes[0].id);
-        self._clearConnSelection();
-        self.renderCanvas();
+        if (self._multiSelectMode) {
+          //多选模式：按下时已把"未选中"的节点加入选中（见 startNodeDrag 开头），
+          //此处只处理点按的另一半——确认是点按后，把按下时就已选中的那个
+          //移出，从而实现再次点按取消。不得像非多选模式那样清空重选，
+          //那会把刚累加的选中抹成单选。
+          const t = self._multiTap;
+          if (t && t.wasSelected) self.selectedNodeIds.delete(t.nodeId);
+          self._multiTap = null;
+          self._clearConnSelection();
+          self.renderCanvas();
+        } else {
+          self.selectedNodeIds.clear();
+          self.selectedNodeIds.add(self.dragState.nodes[0].id);
+          self._clearConnSelection();
+          self.renderCanvas();
+        }
       }
       self.dragState = null;
       self.isDragging = false;
+      //确认为拖拽而非点按时，待定的多选点按就此作废（选中已在按下时处理）。
+      if (self._dragActuallyMoved) self._multiTap = null;
       self._nodeElMap.forEach(el => { el.style.transition = ''; });
       self.renderLines();
 
@@ -5467,7 +5781,9 @@ Object.assign(App, {
   //纯几何命中测试（不依赖 DOM），在任何缩放/平移下都正确
   //命中半径 = SOCKET_HIT_RADIUS（世界坐标，与缩放无关）
   _findSocketHit(wx, wy, excludeNodeId, requireDir) {
-    const r = SOCKET_HIT_RADIUS;
+    //触控模式放大命中半径：手指落点精度低于鼠标，14px 的世界半径在
+    //触屏上难以稳定命中连接点。鼠标路径乘数为 1，行为与此前一致。
+    const r = SOCKET_HIT_RADIUS * (this._touchMode ? TOUCH_SOCKET_RADIUS_SCALE : 1);
     for (const n of this.canvasState.nodes) {
       if (n.id === excludeNodeId) continue;
       if (this._isCollapseHidden(n.id)) continue;   //收起隐藏节点不可作为连线目标
@@ -5605,6 +5921,317 @@ Object.assign(App, {
     if (b.anyMod) return !!(e.ctrlKey || e.metaKey);   //语义兼容（默认未用）
     return !!e.ctrlKey === !!b.ctrl && !!e.metaKey === !!b.meta &&
            !!e.altKey === !!b.alt && !!e.shiftKey === !!b.shift;
+  },
+
+  /*── 指针手势（触控 / 触控笔）──
+     触控没有 hover、右键、Shift/Alt/Ctrl、中键、滚轮与物理键盘，
+     画布操作因此经手势翻译回既有鼠标语义，而不是另写一套拖拽：
+     _bindDragListeners（拖拽途中的移动/抬起）与 _touchFire（手势起手与
+     收尾）是仅有的两个转换点。既有手势代码只读事件上的 clientX/clientY
+     与修饰键，对事件类型无假设，补发同构的合成鼠标事件即可原样工作。
+
+     画布 touch-action:none（见 CSS 5）使浏览器不接管平移与双击缩放。
+     pointerType === 'mouse' 的事件一律放行给既有鼠标处理器，本层只接管
+     touch/pen，故同一物理输入不会被处理两遍。
+
+     单指一次按压的三态分界（共用同一次 pointerdown）：
+       位移 > TOUCH_DRAG_SLOP       → 真实拖拽（补发 mousedown，交给既有 start*）
+       按住 TOUCH_LONGPRESS_MS 不动 → 长按 → 弹出上下文菜单（触控版右键）
+       抬起且前两者皆未发生          → 点击；窗口内的第二次 → 双击
+     双指 → 捏合缩放并平移（滚轮 + 中键拖拽在触控下的等价物）。
+
+     指针捕获：按下即 setPointerCapture，后续 move/up 即便发生在画布
+     之外也会回到画布元素，拖拽不会在画布边缘"断掉"。*/
+
+  //是否为触控/笔指针。鼠标指针放行给既有处理器，本层不介入。
+  _isTouchPointer(e) {
+    return !!e && !!e.pointerType && e.pointerType !== 'mouse';
+  },
+
+  //绑定画布的指针事件（passive:false 才能 preventDefault）。
+  //另在 document 上捕获登记 pointerdown 时间戳：菜单 #ctx 在画布之外，
+  //用户点菜单项不经过 _ptrDown，但必须被记为"真实按下"，否则其 click
+  //会被误判成浏览器补发的 click 而拦掉。
+  _initPointerEvents() {
+    const stage = this._getEl('canvasStage');
+    if (!stage || stage.dataset.pointerBound) return;
+    stage.dataset.pointerBound = '1';
+    stage.addEventListener('pointerdown', e => this._ptrDown(e), { passive: false });
+    stage.addEventListener('pointermove', e => this._ptrMove(e), { passive: false });
+    stage.addEventListener('pointerup', e => this._ptrUp(e), { passive: false });
+    stage.addEventListener('pointercancel', e => this._ptrCancel(e), { passive: false });
+    document.addEventListener('pointerdown', () => { App._lastPointerDownAt = Date.now(); }, true);
+  },
+
+  //补发合成鼠标事件：手势起手与收尾的转换点。既有处理器（节点的
+  //委托 mousedown、socket/手柄的 onmousedown、画布 onmousedown、
+  //连线 click/dblclick、节点/连线/分区 contextmenu）由此原样工作。
+  //bubbles 为 true，使事件能到达委托监听（节点容器 mousedown、
+  //画布容器 onclick 等）；在 document 上补发 move/up 时同样成立。
+  _touchFire(el, type, x, y, mods) {
+    const m = mods || {};
+    return el.dispatchEvent(new MouseEvent(type, {
+      bubbles: true, cancelable: true, view: window,
+      clientX: x, clientY: y, button: 0, buttons: type === 'mouseup' ? 0 : 1,
+      ctrlKey: !!m.ctrl, metaKey: !!m.meta, altKey: !!m.alt, shiftKey: !!m.shift
+    }));
+  },
+
+  _ptrDown(e) {
+    if (!this._isTouchPointer(e)) return;
+    this._touchRecent = Date.now();
+    //首次真实触摸即置触控模式：CSS 据此放大命中区。
+    if (!this._touchMode) {
+      this._touchMode = true;
+      document.body.classList.add('touch');
+    }
+    //规范中阻止浏览器为该指针补发兼容鼠标事件的唯一手段。
+    if (e.cancelable) e.preventDefault();
+    const stage = this._getEl('canvasStage');
+    if (stage && stage.setPointerCapture) {
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* 指针已消失 */ }
+    }
+    if (!this._ptrLive) this._ptrLive = {};
+    this._ptrLive[e.pointerId] = { x: e.clientX, y: e.clientY };
+    //第二指落下 → 由单指转捏合，已起手的单指按现状收尾。
+    if (Object.keys(this._ptrLive).length >= 2) {
+      if (this._touch) this._touchAbortSingle();
+      this._touchPinchStart();
+      return;
+    }
+    if (this._touch || this._touchIgnore) return;
+    const self = this;
+    this._touch = {
+      id: e.pointerId,
+      target: e.target,
+      startX: e.clientX, startY: e.clientY,
+      lastX: e.clientX, lastY: e.clientY,
+      moved: false, longFired: false, needMouseMove: false,
+      timer: setTimeout(function() { self._touchLongPress(); }, TOUCH_LONGPRESS_MS)
+    };
+  },
+
+  _ptrMove(e) {
+    if (!this._isTouchPointer(e)) return;
+    if (e.cancelable) e.preventDefault();
+    if (this._ptrLive && this._ptrLive[e.pointerId]) {
+      this._ptrLive[e.pointerId].x = e.clientX;
+      this._ptrLive[e.pointerId].y = e.clientY;
+    }
+    if (this._touchPinch) { this._touchPinchMove(); return; }
+    //捏合收束后余下的一指不再起新手势，否则会在新位置突然跳一下。
+    if (this._touchIgnore) return;
+    const st = this._touch;
+    if (!st || st.id !== e.pointerId || st.longFired) return;
+    st.lastX = e.clientX; st.lastY = e.clientY;
+    //先越过拖拽阈值 → 转为真实拖拽，长按判定随即作废。
+    if (!st.moved &&
+        Math.abs(e.clientX - st.startX) + Math.abs(e.clientY - st.startY) > TOUCH_DRAG_SLOP) {
+      st.moved = true;
+      clearTimeout(st.timer);
+      this._touchBeginDrag(st);
+      return;
+    }
+    //空白画布的平移 / 框选 / 分区预览由 M13 尾部的 document mousemove
+    //驱动，不经 _bindDragListeners，只有这一路需要补发 mousemove。
+    if (st.moved && st.needMouseMove) this._touchFire(document, 'mousemove', st.lastX, st.lastY);
+  },
+
+  _ptrUp(e) {
+    if (!this._isTouchPointer(e)) return;
+    this._touchRecent = Date.now();
+    //对触控指针在抬起时同样 preventDefault：阻止浏览器为该次按压补发
+    //兼容鼠标事件。缺失时合成的 mousedown 会与浏览器补发的 mousedown
+    //各自启动一次拖拽。
+    if (e.cancelable) e.preventDefault();
+    if (this._ptrLive) delete this._ptrLive[e.pointerId];
+    const stage = this._getEl('canvasStage');
+    if (stage && stage.hasPointerCapture && stage.hasPointerCapture(e.pointerId)) {
+      try { stage.releasePointerCapture(e.pointerId); } catch (err) { /* 已释放 */ }
+    }
+    if (this._touchPinch) {
+      this._touchPinch = null;
+      //仍有指针留在屏幕上：本次捏合结束，余指不再起新手势。
+      if (this._ptrLive && Object.keys(this._ptrLive).length) this._touchIgnore = true;
+      return;
+    }
+    if (this._touchIgnore) {
+      if (!this._ptrLive || !Object.keys(this._ptrLive).length) this._touchIgnore = false;
+      return;
+    }
+    const st = this._touch;
+    if (!st || st.id !== e.pointerId) return;
+    this._touch = null;
+    clearTimeout(st.timer);
+    //长按已出菜单：抬手不再补点击，否则菜单会被随后的合成事件顶掉。
+    if (st.longFired) return;
+    if (!st.moved) { this._touchTap(st, e.clientX, e.clientY); return; }
+    //空白画布一路需要补发 mouseup，让 M13 尾部完成框选 / 分区落定与平移收尾。
+    if (st.needMouseMove) this._touchFire(document, 'mouseup', e.clientX, e.clientY);
+  },
+
+  //指针被系统打断（来电、系统返回手势等）：手势不能悬空，
+  //按现状收尾并清干净状态。
+  _ptrCancel(e) {
+    if (!this._isTouchPointer(e)) return;
+    const st = this._touch;
+    if (st && st.id === e.pointerId) {
+      this._touch = null;
+      clearTimeout(st.timer);
+      if (st.moved && st.needMouseMove) this._touchFire(document, 'mouseup', st.lastX, st.lastY);
+    }
+    this._touchPinch = null;
+    if (this._ptrLive) delete this._ptrLive[e.pointerId];
+  },
+
+  //手势起手：补发一次 mousedown，命中判定与命中路由全部由既有处理器完成
+  //（连接点 / 调整手柄 / 节点 / 分区 / 空白画布五条路各有各的处理器）。
+  //框选模式下空白画布按 Shift 放行，接 onCanvasMouseDown 内的框选分支。
+  _touchBeginDrag(st) {
+    this._touchFire(st.target, 'mousedown', st.lastX, st.lastY,
+      { shift: this._boxModeActive });
+    st.needMouseMove = !!(this.canvasPanState || this.canvasBoxState || this.regionDragState);
+  },
+
+  //长按：触控版的右键。按下点命中的对象决定弹出哪种菜单——
+  //节点 / 连线 / 分区各自补发 contextmenu，沿用既有右键菜单；
+  //空白画布没有既有右键入口，弹画布菜单（补齐无键盘的粘贴与全选）。
+  _touchLongPress() {
+    const st = this._touch;
+    if (!st || st.moved || st.longFired) return;
+    st.longFired = true;
+    const el = st.target;
+    const x = st.lastX, y = st.lastY;
+    const isNode = !!(el.closest && el.closest('.node'));
+    const isConn = !!(el.closest && el.closest('.line, .line-label'));
+    const isRegion = !!(el.closest && el.closest('.region-rect, .region-label'));
+    //菜单刚由长按弹出，抬手时落点仍在菜单附近。若此时浏览器补发一个
+    //click，它会落到菜单项上或把菜单关掉。设一个短时间窗，由 M13 尾部
+    //的 click 处理器按"有无前置 pointerdown"甄别并拦下补发的那一个；
+    //用户真正点菜单项必然先有 pointerdown，不受影响。
+    this._ctxGuardUntil = Date.now() + TOUCH_CTX_GUARD_MS;
+    if (isNode || isConn || isRegion) {
+      this._touchFire(el, 'contextmenu', x, y);
+    } else {
+      this.showCanvasCtx(x, y);
+    }
+    //菜单整体下移一段，避开指尖正下方——否则抬手补发的 click 即使未被
+    //拦下，也会正好命中菜单第一项。
+    const m = this._getEl('ctx');
+    if (m) {
+      const rect = m.getBoundingClientRect();
+      m.style.top = Math.max(4, Math.min(y + 30, innerHeight - rect.height - 4)) + 'px';
+    }
+  },
+
+  //点击与双击：补发与真实鼠标完全同构的
+  //mousedown → mouseup → click 序列。节点选中、内联编辑的双击判定、
+  //连线选中、连接点收起切换、分区选中因此都无需另写分支。
+  //窗口内位置相近的第二次点击追加一次 dblclick（画布建节点依赖它）。
+  _touchTap(st, x, y) {
+    const el = st.target;
+    this._touchFire(el, 'mousedown', x, y);
+    this._touchFire(el, 'mouseup', x, y);
+    this._touchFire(el, 'click', x, y);
+    const now = Date.now();
+    const lt = this._touchLastTap;
+    if (lt && now - lt.time < TOUCH_DOUBLE_MS &&
+        Math.abs(x - lt.x) <= TOUCH_DOUBLE_SLOP && Math.abs(y - lt.y) <= TOUCH_DOUBLE_SLOP) {
+      this._touchLastTap = null;
+      this._touchFire(el, 'dblclick', x, y);
+    } else {
+      this._touchLastTap = { time: now, x: x, y: y };
+    }
+  },
+
+  //第二指落下时中止单指手势：已起手者按现状收尾，未起手者直接作废。
+  _touchAbortSingle() {
+    const st = this._touch;
+    if (!st) return;
+    this._touch = null;
+    clearTimeout(st.timer);
+    if (st.moved) {
+      this._touchFire(document, 'mouseup', st.lastX, st.lastY);
+      this._touchIgnore = true;
+    }
+  },
+
+  /*── 捏合缩放（滚轮在触控下的等价物）──
+     以两指中点为锚缩放，中点自身的位移同步平移，因此双指可同时
+     缩放与平移。倍率按起始间距与当前间距之比计算，避免逐帧累积误差
+     导致缩放漂移。*/
+  _touchPinchStart() {
+    const p = this._ptrGeometry();
+    if (!p || p.dist < TOUCH_PINCH_MIN_DIST) return;
+    this._touchPinch = {
+      dist: p.dist, startScale: this.scale, midX: p.midX, midY: p.midY
+    };
+  },
+  _touchPinchMove() {
+    const g = this._touchPinch;
+    if (!g) return;
+    const p = this._ptrGeometry();
+    if (!p || p.dist < TOUCH_PINCH_MIN_DIST) return;
+    const stage = this._getEl('canvasStage');
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    //先按中点位移平移，再以平移后的中点为锚缩放，二者叠加才与直觉一致。
+    this.panX += (p.midX - g.midX);
+    this.panY += (p.midY - g.midY);
+    g.midX = p.midX; g.midY = p.midY;
+    const target = Weave.Util.clamp(g.startScale * (p.dist / g.dist), 0.15, 5);
+    this._zoomAbout(p.midX - rect.left, p.midY - rect.top, target);
+    this._refreshContainerCache();
+    this.clampPan();
+    this.applyViewTransform();
+    this.debouncedAutoSave();
+  },
+
+  //前两枚活动指针的中点与间距（捏合的锚点与倍率来源）。
+  _ptrGeometry() {
+    if (!this._ptrLive) return null;
+    const ids = Object.keys(this._ptrLive);
+    if (ids.length < 2) return null;
+    const a = this._ptrLive[ids[0]], b = this._ptrLive[ids[1]];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    return {
+      midX: (a.x + b.x) / 2, midY: (a.y + b.y) / 2,
+      dist: Math.sqrt(dx * dx + dy * dy)
+    };
+  },
+
+  /*── 框选模式 ──
+     Shift+拖拽在触控下没有对应修饰键，故以模式开关替代，
+     与既有的分区模式（_regionModeActive + btnRegion）同构：
+     开启后画布单指拖拽即框选，再次触发或 Escape 关闭。*/
+  _setBoxMode(on) {
+    this._boxModeActive = on;
+    const stage = this._getEl('canvasStage');
+    if (stage) stage.classList.toggle('box-mode', on);
+    //模式开关与只读 / 多选模式同处侧边栏，共用 active 反馈
+    const btn = this._getEl('btnBox');
+    if (btn) btn.classList.toggle('active', on);
+  },
+  toggleBoxMode() {
+    this._setBoxMode(!this._boxModeActive);
+    this.showToast(this.t(this._boxModeActive ? 'toast.boxModeOn' : 'toast.boxModeOff'), 'info');
+  },
+
+  /*── 多选模式 ──
+     与框选模式同为画布手势模式开关，故与之一并置于 M08：
+     它改写的正是本模块 startNodeDrag 的点按语义。开启后点按节点
+     累加/移出选中（不再单选替换），拖动画布不清除选中，单击空白
+     画布仍取消。与 Ctrl+单击同语义但无需修饰键——供触控与外接键盘
+     不便按 Ctrl 的场景使用。瞬态状态，不随存档保存。*/
+  _setMultiSelectMode(on) {
+    this._multiSelectMode = on;
+    //模式开关与只读 / 框选模式同处侧边栏，共用 active 反馈
+    const btn = this._getEl('btnMultiSelect');
+    if (btn) btn.classList.toggle('active', on);
+  },
+  toggleMultiSelectMode() {
+    this._setMultiSelectMode(!this._multiSelectMode);
+    this.showToast(this.t(this._multiSelectMode ? 'toast.multiSelectOn' : 'toast.multiSelectOff'), 'info');
   }
 });
 
@@ -6773,12 +7400,19 @@ Object.assign(App, {
     if (s.onUp) document.removeEventListener('keyup', s.onUp, true);
   },
   //填充设置弹窗中的键位框并绑定录制交互（Init 调用一次）。
+  //把当前 _keybinds 写回设置弹窗里的键位输入框。绑定、重置、录制后都要刷新，
+  //此前这段循环在绑定与重置里各写一份。
+  _refreshKeybindInputs() {
+    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
+      const b = this._keybinds[input.getAttribute('data-kb')];
+      if (b) input.value = this._keybindLabel(b);
+    });
+  },
   _bindKeybindInputs() {
     const self = this;
+    this._refreshKeybindInputs();
     document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
       const action = input.getAttribute('data-kb');
-      const b = this._keybinds[action];
-      if (b) input.value = this._keybindLabel(b);
       input.addEventListener('click', () => {
         input.blur();
         self._startKeybindEdit(action, input);
@@ -6789,10 +7423,7 @@ Object.assign(App, {
   _resetKeybinds() {
     this._settings.set('keybinds', '');   //清空用户存档 → _loadKeybinds 返回纯默认
     this._keybinds = this._loadKeybinds();
-    document.querySelectorAll('#settingsModal input[data-kb]').forEach(input => {
-      const b = this._keybinds[input.getAttribute('data-kb')];
-      if (b) input.value = this._keybindLabel(b);
-    });
+    this._refreshKeybindInputs();
     this.showToast(this.t('toast.keysReset'));
   },
   //重置常规页 4 个对齐设置：逐项恢复到 _settings 表的出厂默认（def，当前全开）。
@@ -6826,6 +7457,9 @@ Object.assign(App, {
   },
 
   //── 上下文菜单 ──
+  //三种命中各一套菜单：节点 / 连线 / 分区，沿用既有右键路径；
+  //三者皆空 = 画布菜单（触控端空白处长按），补齐无键盘的粘贴 / 全选 /
+  //框选模式 / 适应视图。
   //分区右键：regionId 非空 → 显示 属性 / 移动分区框 / 调整分区框大小 / 删除；
   //节点/连线路径不变。"属性"与"删除"复用节点同款按钮（与节点菜单一致）。
   showCtx(x, y, nodeId, connId, editTarget, regionId) {
@@ -6839,19 +7473,25 @@ Object.assign(App, {
     //自适应菜单：节点显示 编辑 / 复制 / 镜像 / 属性 / 删除；
     //连线只显示编辑标签 / 删除以及曲线相关项。
     const isConn = !!connId;
+    //画布菜单：既非节点也非连线/分区——节点与连线同时存在时以节点为准，
+    //故此处三者皆空才成立。
+    const isCanvas = !nodeId && !isConn && !isRegion;
+    const isNode = !isConn && !isRegion && !isCanvas;
     const set = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? '' : 'none'; };
-    set('ctxEdit', true);
-    set('ctxDup', !isConn && !isRegion);
-    set('ctxMirror', !isConn && !isRegion);
-    set('ctxProps', !isConn);
-    set('ctxDel', true);
-    set('ctxSep1', !isConn);
-    set('ctxSepMirror', !isConn && !isRegion);
-    set('ctxSep2', !isConn && !isRegion);
+    set('ctxEdit', !isCanvas);
+    set('ctxDup', isNode);
+    //高亮关联：替代触控端缺失的 Alt 单击，鼠标端同样呈现。
+    set('ctxHl', isNode);
+    set('ctxMirror', isNode);
+    set('ctxProps', !isConn && !isCanvas);
+    set('ctxDel', !isCanvas);
+    set('ctxSep1', !isConn && !isCanvas);
+    set('ctxSepMirror', isNode);
+    set('ctxSep2', isNode);
     //节点操作：每个节点都可用调整大小和重置大小。
-    set('ctxResize', !isConn && !isRegion);
-    set('ctxResetSize', !isConn && !isRegion);
-    set('ctxSepDanger', !isConn);
+    set('ctxResize', isNode);
+    set('ctxResetSize', isNode);
+    set('ctxSepDanger', !isConn && !isCanvas);
     set('ctxCurve', isConn && !isRegion);
     set('ctxSepCurve', isConn && !isRegion);
     set('ctxResetCurve', isConn && !isRegion);
@@ -6860,16 +7500,40 @@ Object.assign(App, {
     set('ctxRegionMove', isRegion);
     set('ctxRegionResize', isRegion);
     set('ctxSepRegion', isRegion);
+    //画布专属项：触控端空白处长按的落点。
+    set('ctxSepCanvas', isCanvas);
+    set('ctxPaste', isCanvas);
+    set('ctxSelectAll', isCanvas);
+    set('ctxBoxMode', isCanvas);
+    set('ctxFit', isCanvas);
 
     const ctxEdit = this._getEl('ctxEdit');
     if (ctxEdit) ctxEdit.textContent = this.t(isConn ? 'ctx.editLabel' : (editTarget === 'desc' ? 'ctx.editDesc' : 'ctx.edit'));
     const m = this._getEl('ctx');
-    m.style.left = Math.max(0, Math.min(x, innerWidth - 110)) + 'px';
-    m.style.top = Math.max(0, Math.min(y, innerHeight - 100)) + 'px';
     m.style.display = 'block';
+    //按菜单实测尺寸贴边：窄屏上固定 110/100 的余量会把菜单推出视口。
+    const mw = m.offsetWidth || 110, mh = m.offsetHeight || 100;
+    m.style.left = Math.max(4, Math.min(x, innerWidth - mw - 4)) + 'px';
+    m.style.top = Math.max(4, Math.min(y, innerHeight - mh - 4)) + 'px';
     //当某个节点的上下文菜单打开时，悬停删除的 "X" 必须保持
     //隐藏（在下次点击菜单关闭后会重新出现）。
-    document.body.classList.toggle('ctx-open', !isConn && !isRegion);
+    document.body.classList.toggle('ctx-open', isNode);
+  },
+
+  //画布菜单（触控端空白处长按的入口）：三目标皆空即落入画布菜单。
+  //触控没有右键也没有物理键盘，粘贴（Ctrl+V）、全选（Ctrl+A）、
+  //框选模式与适应视图原本只经由键盘或右键可达。
+  showCanvasCtx(x, y) {
+    this.showCtx(x, y, null, null, null, null);
+  },
+
+  //高亮关联节点：与鼠标端 Alt+单击节点同语义。触控端无修饰键，
+  //此项为唯一入口。打开菜单已清除高亮，此处重建集合。
+  ctxHl() {
+    const id = this._ctxNodeId;
+    if (!id) { this._clearCtx(); return; }
+    this._highlightAtNode(id);
+    this._clearCtx();
   },
 
   ctxEdit() {
@@ -7711,9 +8375,10 @@ document.addEventListener('mouseup', function() {
     //真实发生过位移的平移结束后，浏览器补发的 click 应被吞掉（否则
     //它会走空白单击路径清除刚保留下来的高亮）。无位移的空白单击
     //(_panActuallyMoved=false) 不吞，照常清除高亮/选中。
-    //仅在关联高亮激活时吞掉平移补发的 click：无高亮时保持历史行为
+    //关联高亮激活时吞掉平移补发的 click：无高亮时保持历史行为
     //（平移松手的 click 照旧走空白单击路径）。
-    App._panJustFinished = App._panActuallyMoved && !!App.hlNodeIds;
+    //多选模式同理吞掉——多选模式下拖动画布不清除选中，单击空白才清。
+    App._panJustFinished = App._panActuallyMoved && (!!App.hlNodeIds || App._multiSelectMode);
     App._panActuallyMoved = false;
     //仅视图变化：已做防抖，与缩放 / 恢复一致（beforeunload 覆盖
     //防抖窗口内关闭页面的情况）。
@@ -7748,12 +8413,29 @@ document.addEventListener('mouseup', function(e) {
 
 //上下文菜单关闭（捕获阶段：在菜单项的
 //冒泡 click 消费掉存储的 ctx 状态之前隐藏菜单）
-document.addEventListener('click', () => { App._getEl('ctx').style.display = 'none'; document.body.classList.remove('ctx-open'); }, true);
+//长按刚弹出菜单时，浏览器为"抬起手指"补发的 click 会落到菜单项上或
+//把菜单关掉（菜单此时正画在手指附近）。判据用"此前有无真实
+//pointerdown"——用户点菜单一定先有 pointerdown，补发的 click 前面没有。
+document.addEventListener('click', e => {
+  const stray = Date.now() < (App._ctxGuardUntil || 0) &&
+                Date.now() - (App._lastPointerDownAt || 0) > TOUCH_STRAY_CLICK_MS;
+  if (stray) { e.stopPropagation(); e.preventDefault(); return; }
+  App._getEl('ctx').style.display = 'none';
+  document.body.classList.remove('ctx-open');
+}, true);
 
-//弹窗事件
-document.getElementById('cpModal').addEventListener('click', function(e) { if (e.target === this) App.cancelCustomPicker(); });
-document.getElementById('settingsModal').addEventListener('click', function(e) { if (e.target === this) App.closeSettings(); });
-document.getElementById('regionModal').addEventListener('click', function(e) { if (e.target === this) App.closeRegionModal(); });
+//弹窗事件：点遮罩空白处关闭。只列已经具备该行为的弹窗——节点详情弹窗
+//（#modal）历史上没有遮罩点击关闭，补上它属于新增行为，不在此统一。
+const OVERLAY_DISMISS = [
+  ['cpModal', () => App.cancelCustomPicker()],
+  ['settingsModal', () => App.closeSettings()],
+  ['regionModal', () => App.closeRegionModal()]
+];
+for (const [id, dismiss] of OVERLAY_DISMISS) {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) dismiss();
+  });
+}
 
 //键盘
 document.addEventListener('keydown', function(e) {
@@ -7777,6 +8459,10 @@ document.addEventListener('keydown', function(e) {
     if (App._curveEditState) App._exitCurveEdit(true);
     //分区创建模式（Region 键）用 Escape 退出。
     if (App._regionModeActive) App._setRegionMode(false);
+    //框选模式（触控端 Shift+拖拽的替代）同样用 Escape 退出。
+    if (App._boxModeActive) App._setBoxMode(false);
+    //多选模式同样用 Escape 退出。
+    if (App._multiSelectMode) App._setMultiSelectMode(false);
     //分区框调整大小 / 仅移动框体模式用 Escape 退出。
     if (App._regionResizeId) { App._exitRegionResize(); App.renderCanvas(); }
     if (App._frameMoveRegionId) {
@@ -7868,10 +8554,14 @@ document.addEventListener('keydown', function(e) {
     ctxEdit: 'ctxEdit', ctxDup: 'ctxDup', ctxMirror: 'ctxMirror',
     ctxResize: 'ctxResize', ctxResetSize: 'ctxResetSize', ctxProps: 'ctxProps',
     ctxCurve: 'ctxCurveDrag', ctxResetCurve: 'ctxResetCurve', ctxDel: 'ctxDel',
+    ctxHl: 'ctxHl',
+    ctxPaste: 'pasteNodes', ctxSelectAll: 'selectAllNodes',
+    ctxBoxMode: 'toggleBoxMode', ctxFit: 'centerCanvasOnNodes',
     ctxRegionMove: 'ctxRegionFrameMove', ctxRegionResize: 'ctxRegionResizeMode',
-    btnRegion: 'toggleRegionMode',
+    btnRegion: 'toggleRegionMode', btnBox: 'toggleBoxMode',
+    btnMultiSelect: 'toggleMultiSelectMode',
     btnCloseModal: 'closeModal', btnSaveModal: 'saveModal',
-    btnCloseRegionModal: 'closeRegionModal', btnSaveRegionModal: 'saveRegionModal',
+    btnShowSettings: 'showSettings', btnCloseSettings: 'closeSettings',
     btnCloseRegionModal: 'closeRegionModal', btnSaveRegionModal: 'saveRegionModal',
     btnCancelPicker: 'cancelCustomPicker', btnConfirmColor: 'confirmCustomColor',
     btnResetKeybinds: '_resetKeybinds',
@@ -7886,17 +8576,17 @@ document.addEventListener('keydown', function(e) {
     btn.addEventListener('click', () => App.setLang(btn.getAttribute('data-lang')));
   });
 
-  /* Σ 彩蛋：键盘可达性（Enter/Space 触发） */
-  const brandSigma = document.getElementById('brandSigma');
-  if (brandSigma) {
-    brandSigma.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); App.startEasterEgg(); }
-    });
-  }
-  const aboutSigma = document.getElementById('aboutSigma');
-  if (aboutSigma) {
-    aboutSigma.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); App.spinAboutSigma(); }
+  /* Σ 彩蛋键盘可达性：顶部品牌区与「软件详情」面板的 Σ 图标同为
+     「Enter/Space 触发」，共用一张表，键名判据只写一处。 */
+  const BIND_KEYS = [
+    ['brandSigma', () => App.startEasterEgg()],
+    ['aboutSigma', () => App.spinAboutSigma()]
+  ];
+  for (const [id, fire] of BIND_KEYS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
     });
   }
 
@@ -7920,8 +8610,6 @@ document.addEventListener('keydown', function(e) {
       App._settings.setBool(d.store, this.checked);
     });
   }
-  document.getElementById('btnShowSettings').addEventListener('click', () => App.showSettings());
-  document.getElementById('btnCloseSettings').addEventListener('click', () => App.closeSettings());
   /* 设置弹窗侧边导航 */
   document.querySelectorAll('.settings-nav-item').forEach(btn => {
     btn.addEventListener('click', () => App._showSettingsTab(btn.getAttribute('data-settings-tab')));

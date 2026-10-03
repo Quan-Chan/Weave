@@ -34,7 +34,7 @@ jobs:
 
   # ── Job 2: GUI 全量回归(真实浏览器) ──
   gui:
-    name: GUI 回归 (smoke/data-safety/region/collapse/fold/min)
+    name: GUI 回归 (smoke/data-safety/recovery/region/collapse/fold/hl/touch/multi/layout/min)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

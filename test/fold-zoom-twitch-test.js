@@ -1,21 +1,16 @@
-
 'use strict';
 // 【fold 渲染回归族 3/3 · 缩放渲染稳定】
 // 验证: 快速滚轮缩放时 socket scale 不回落到 1(无抽搐闪烁)
-const { launchBrowser, openApp, sleep } = require('./helpers/launch.js');
+const { launchBrowser, openApp, sleep, setupChain, mkNode } = require('./helpers/launch.js');
 (async () => {
   const { browser, cleanup } = await launchBrowser(false);
   let exitCode = 1;   // try 外声明,供 finally 后退出
   try {
   const { page } = await openApp(browser);
-  await page.evaluate(() => {
-    const mk = (label, x, y) => ({ id: 'x_' + label, label, desc: '', color: 'blue', x, y, mirrored: false, w: 170, h: 80 });
-    App.canvasState.nodes = [mk('A', 0, 0), mk('B', 320, 0)];
-    App.canvasState.connections = [{ id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false }];
-    App._nodeZOrder = App.canvasState.nodes.map(n => n.id);
-    App.saveCanvasSnapshot();
-    App.renderCanvas();
-  });
+  // A→B 标准链：建、连线、z 序与快照由台架 setupChain 统一完成
+  await setupChain(page, [mkNode('x_A', 'A', 0, 0), mkNode('x_B', 'B', 320, 0)], [
+    { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false }
+  ]);
   await sleep(300);
   await page.evaluate(() => { App.centerCanvasOnNodes(); });
   await sleep(400);

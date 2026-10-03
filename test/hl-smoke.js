@@ -2,37 +2,13 @@
 // 关联高亮（按住 Alt 单击节点）专项冒烟测试
 // 覆盖：高亮集合与抬升、连线抬升层的叠放、非高亮内容的背景模糊、清除后的还原。
 // 用法: node test/hl-smoke.js
-const puppeteer = require('puppeteer-core');
-const path = require('path');
-const { pathToFileURL } = require('url');
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let fails = 0;
-const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if (!cond) fails++; };
+const { sleep, launchBrowser, openApp, dblClick, assertions } = require('./helpers/launch');
+const tally = assertions();
+const ok = tally.ok;
 
 (async () => {
-  const browser = await puppeteer.launch({
-    executablePath: EDGE, headless: true,
-    args: ['--no-first-run', '--no-sandbox', '--disable-gpu', '--window-size=1280,800'],
-    defaultViewport: { width: 1280, height: 800 }
-  });
-  const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: 'load' });
-  await page.waitForFunction('!!window.App && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(500);
-  const open = await page.evaluate('document.getElementById("settingsModal").classList.contains("on")');
-  if (open) { await page.keyboard.press('Escape'); await sleep(200); }
-  const cdp = await page.createCDPSession();
-  const dbl = async (x, y) => {
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
-    await sleep(70);
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 2 });
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 2 });
-    await sleep(250);
-  };
+  const { browser, cleanup } = await launchBrowser(false);
+  const { page, cdp } = await openApp(browser);
   const modClick = async (px, py, alt) => {
     const mods = alt ? 1 : 0; // 1 = Alt
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: px, y: py });
@@ -62,9 +38,9 @@ const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if 
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }, i);
   // 建 A B C 链
-  await dbl(cx - 320, cy);
-  await dbl(cx, cy);
-  await dbl(cx + 320, cy);
+  await dblClick(page, cdp, cx - 320, cy);
+  await dblClick(page, cdp, cx, cy);
+  await dblClick(page, cdp, cx + 320, cy);
   await sleep(200);
   ok((await page.evaluate('App.canvasState.nodes.length')) === 3, '建出 3 个节点');
   const sockPos = async (i, side) => await page.evaluate((idx, sd) => {
@@ -305,7 +281,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✅ ' : '  ❌ ') + msg); if 
   ok(/socket/.test(cross.atSocket), '高亮节点连接点盖住连线（命中 ' + cross.atSocket + '）');
   ok(cross.geoDelta <= 1, '高亮前后连线几何一致（最大偏差 ' + cross.geoDelta + 'px）');
 
-  console.log(fails === 0 ? '✅ 关联高亮冒烟全部通过' : '❌ 存在 ' + fails + ' 项失败');
-  await browser.close();
-  process.exit(fails === 0 ? 0 : 1);
+  console.log(tally.fails === 0 ? '✅ 关联高亮冒烟全部通过' : '❌ 存在 ' + tally.fails + ' 项失败');
+  await cleanup();
+  process.exit(tally.fails === 0 ? 0 : 1);
 })().catch(e => { console.error('💥', e); process.exit(2); });

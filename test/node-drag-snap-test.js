@@ -3,13 +3,10 @@
 // 覆盖动画最终提交、renderCanvas 中断冻结、无操作不入栈、多节点整组单历史，
 // 以及 undo/redo 与 localStorage 的一致性。等待动画集合/时钟归零，不依赖固定 sleep。
 // 用法: node test/node-drag-snap-test.js [--headed]
-const { launchBrowser, openApp, dblClick } = require('./helpers/launch.js');
+const { launchBrowser, openApp, dblClick, assertions } = require('./helpers/launch.js');
 
-let failures = 0;
-const ok = (cond, msg) => {
-  console.log((cond ? '✅ ' : '❌ ') + msg);
-  if (!cond) failures++;
-};
+const tally = assertions();
+const ok = tally.ok;
 const detail = value => {
   try { return JSON.stringify(value); } catch (_) { return String(value); }
 };
@@ -332,8 +329,8 @@ async function runDoubleClickSmoke(page, cdp) {
     await launched.cleanup();
   }
 
-  console.log(failures === 0 ? '\n✅ 节点拖拽吸附测试全部通过' : '\n❌ 节点拖拽吸附测试 ' + failures + ' 项失败（当前实现上的回归证据）');
-  process.exitCode = failures === 0 ? 0 : 1;
+  console.log(tally.fails === 0 ? '\n✅ 节点拖拽吸附测试全部通过' : '\n❌ 节点拖拽吸附测试 ' + tally.fails + ' 项失败（当前实现上的回归证据）');
+  process.exitCode = tally.fails === 0 ? 0 : 1;
 })().catch(err => {
   console.error('测试异常:', err && err.stack ? err.stack : err);
   process.exitCode = 1;

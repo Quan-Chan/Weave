@@ -1,22 +1,11 @@
 'use strict';
 // 验证设置弹窗中 hlNode 键位的录制/显示/重置（纯修饰键手势）
-const puppeteer = require('puppeteer-core');
-const path = require('path');
-const { pathToFileURL } = require('url');
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let fails = 0;
-const ok = (c, m) => { console.log((c ? '  ✅ ' : '  ❌ ') + m); if (!c) fails++; };
+const { sleep, launchBrowser, openApp, assertions } = require('./helpers/launch');
+const tally = assertions();
+const ok = tally.ok;
 (async () => {
-  const browser = await puppeteer.launch({ executablePath: EDGE, headless: true,
-    args: ['--no-first-run', '--no-sandbox', '--disable-gpu', '--window-size=1280,800'], defaultViewport: { width: 1280, height: 800 } });
-  const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: 'load' });
-  await page.waitForFunction('!!window.App && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(500);
-  const open = await page.evaluate('document.getElementById("settingsModal").classList.contains("on")');
-  if (open) { await page.keyboard.press('Escape'); await sleep(200); }
+  const { browser, cleanup } = await launchBrowser(false);
+  const { page } = await openApp(browser);
   // 打开设置 → 键位信息面板
   await page.click('#btnShowSettings');
   await sleep(300);
@@ -72,7 +61,7 @@ const ok = (c, m) => { console.log((c ? '  ✅ ' : '  ❌ ') + m); if (!c) fails
   await sleep(300);
   const reset = await page.evaluate(() => ({ v: document.querySelector('input[data-kb="hlNode"]').value, kb: App._keybinds.hlNode }));
   ok(reset.v === 'Alt' && reset.kb.alt === true, '重置后恢复 Alt');
-  console.log(fails === 0 ? '✅ 键位录制/显示/重置验证通过' : '❌ 失败 ' + fails);
-  await browser.close();
-  process.exit(fails === 0 ? 0 : 1);
+  console.log(tally.fails === 0 ? '✅ 键位录制/显示/重置验证通过' : '❌ 失败 ' + tally.fails);
+  await cleanup();
+  process.exit(tally.fails === 0 ? 0 : 1);
 })().catch(e => { console.error('💥', e); process.exit(2); });

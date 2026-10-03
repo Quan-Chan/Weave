@@ -2,13 +2,10 @@
 // 数据安全专项 GUI 回归：导入原子性、只读入口、文本编辑快捷键与持久化失败。
 // 这些断言刻意针对“失败后不得留下半替换状态”和“用户输入不得被原地改写”的契约。
 // 失败会被汇总为断言，不通过 page.evaluate 抛出浏览器异常。
-const { launchBrowser, openApp } = require('./helpers/launch.js');
+const { launchBrowser, openApp, assertions } = require('./helpers/launch.js');
 
-let failures = 0;
-const ok = (cond, msg) => {
-  console.log((cond ? '✅ ' : '❌ ') + msg);
-  if (!cond) failures++;
-};
+const tally = assertions();
+const ok = tally.ok;
 const detail = value => {
   try { return JSON.stringify(value); } catch (_) { return String(value); }
 };
@@ -760,8 +757,8 @@ async function runPersistenceFailureTest(page) {
     await launched.cleanup();
   }
 
-  console.log(failures === 0 ? '\n✅ 数据安全专项测试全部通过' : '\n❌ 数据安全专项测试 ' + failures + ' 项失败（当前实现上的回归证据）');
-  process.exitCode = failures === 0 ? 0 : 1;
+  console.log(tally.fails === 0 ? '\n✅ 数据安全专项测试全部通过' : '\n❌ 数据安全专项测试 ' + tally.fails + ' 项失败（当前实现上的回归证据）');
+  process.exitCode = tally.fails === 0 ? 0 : 1;
 })().catch(err => {
   console.error('测试异常:', err && err.stack ? err.stack : err);
   process.exitCode = 1;

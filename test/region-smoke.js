@@ -1,52 +1,26 @@
 // 分区功能专项 GUI 冒烟测试（puppeteer-core + 系统 Edge 无头）
 // 用法: node test/region-smoke.js [--headed]
-const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
-const { pathToFileURL } = require('url');
+const { sleep, launchBrowser, openApp, assertions } = require('./helpers/launch');
 
-// 浏览器可执行文件: 环境变量优先(CI), 缺省回退本机 Edge
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-// 应用地址: 相对定位仓库内文件(可移植)
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
 const SHOTS = path.join(__dirname, 'shots-region');
 fs.mkdirSync(SHOTS, { recursive: true });
 const HEADED = process.argv.includes('--headed');
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let failures = 0;
-const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!cond) failures++; };
+const tally = assertions();
+const ok = tally.ok;
 
 (async () => {
-  const browser = await puppeteer.launch({
-    executablePath: EDGE,
-    headless: !HEADED,
-    args: ['--no-first-run', '--no-sandbox', '--disable-gpu', '--window-size=1280,800'],
-    defaultViewport: { width: 1280, height: 800 }
-  });
-  const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: 'load' });
-  await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(500);
-  // 关闭首次设置弹窗
-  await page.keyboard.press('Escape');
-  await sleep(150);
+  // 台架内含「launch 失败则 spawn + connect」的降级路径；clearStorage 等价于
+  // 原先「清 localStorage 再 reload」的取出厂状态做法，且只清一次。
+  const { browser, cleanup } = await launchBrowser(HEADED);
+  const { page, cdp } = await openApp(browser, { clearStorage: true });
 
   const stage = await page.evaluate(() => {
     const r = document.getElementById('canvasStage').getBoundingClientRect();
     return { left: r.left, top: r.top, w: r.width, h: r.height };
   });
 
-  // ── 1) 清空可能存在的旧存档状态（仅清 nodes；region 也一并清）──
-  await page.evaluate(() => {
-    localStorage.clear();
-    location.reload();
-  });
-  await sleep(800);
-  await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await page.keyboard.press('Escape');
-  await sleep(150);
-
-  const cdp = await page.createCDPSession();
   const dbl = async (x, y) => {
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
     await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
@@ -978,8 +952,8 @@ const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!co
   ok(a21.selRegion === null && a21.selNodes === 1, '双击建节点后分区不选中（selRegion=' + a21.selRegion + '），新节点选中（selNodes=' + a21.selNodes + '）');
   await page.screenshot({ path: path.join(SHOTS, '19_gesture_semantics.png') });
 
-  console.log(failures === 0 ? '\n✅ 分区测试全部通过' : '\n❌ ' + failures + ' 项失败');
-  await browser.close();
-  process.exit(failures === 0 ? 0 : 1);
+  console.log(tally.fails === 0 ? '\n✅ 分区测试全部通过' : '\n❌ ' + tally.fails + ' 项失败');
+  await cleanup();
+  process.exit(tally.fails === 0 ? 0 : 1);
 })().catch(e => { console.error('测试异常:', e); process.exit(1); });
 

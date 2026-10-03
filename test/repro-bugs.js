@@ -3,45 +3,14 @@
 // 1) P0-1: 嵌套收起 → 移动根 → 展开外层根，内层偏移读脏数据（错位）
 // 2) P0-2: 导入数据 collapse.hidden 含 null → _restoreFromSerialized 崩溃
 // 3) blur 误建线: socket 拖拽中 window blur → onUp(FocusEvent) 误建线
-const { spawn } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const puppeteer = require('puppeteer-core');
-const { pathToFileURL } = require('url');
-// 浏览器可执行文件: 环境变量优先(CI), 缺省回退本机 Edge
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-// 应用地址: 相对定位仓库内文件(可移植)
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const { launchBrowser, openApp, sleep } = require('./helpers/launch');
 
 (async () => {
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-repro-'));
-  const edgeProc = spawn(EDGE, [
-    '--headless=new', '--disable-gpu', '--no-first-run', '--window-size=1280,800',
-    '--remote-debugging-port=0', '--user-data-dir=' + userDataDir, 'about:blank'
-  ], { stdio: ['ignore', 'ignore', 'ignore'] });
-  edgeProc.on('error', e => console.log('edge spawn error: ' + e.message));
-  const portFile = path.join(userDataDir, 'DevToolsActivePort');
-  const deadline = Date.now() + 25000;
-  let wsUrl = null;
-  while (Date.now() < deadline && !wsUrl) {
-    if (fs.existsSync(portFile)) {
-      const pl = fs.readFileSync(portFile, 'utf8').split(/\r?\n/).filter(Boolean);
-      if (pl.length >= 2) wsUrl = 'ws://127.0.0.1:' + pl[0] + pl[1];
-    }
-    if (!wsUrl) await sleep(200);
-  }
-  if (!wsUrl) { console.log('FAIL: no ws'); process.exit(1); }
-  const browser = await puppeteer.connect({ browserWSEndpoint: wsUrl, defaultViewport: { width: 1280, height: 800 }, protocolTimeout: 120000 });
-  const page = await browser.newPage();
+  // 台架自带 launch 失败后的 spawn+connect 降级路径，无需在此重复实现。
+  const { browser, cleanup } = await launchBrowser(false);
+  const { page } = await openApp(browser);
   const errors = [];
   page.on('pageerror', e => errors.push('PAGEERROR: ' + e.message));
-  await page.goto(APP_URL, { waitUntil: 'load' });
-  await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(600);
-  await page.keyboard.press('Escape');
-  await sleep(200);
 
   // ══ 测试 1: P0-1 嵌套展开偏移脏读 ══
   const t1 = await page.evaluate(() => {
@@ -142,9 +111,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   if (t2.crashed) fails.push('T2 导入 null 崩溃复现');
   if (!t3ok) fails.push('T3 blur 误建线复现');
   if (errors.length) fails.push('页面 JS 错误 ' + errors.length + ' 条');
-  await browser.close();
-  try { edgeProc.kill(); } catch (e) {}
-  await sleep(300);
+  await cleanup();
   if (fails.length) { console.log('❌ 复现项: ' + fails.join('; ')); process.exit(1); }
   console.log('✅ 三疑点均未复现(PASS)');
   process.exit(0);

@@ -2,9 +2,9 @@
 // 【fold 渲染回归族 2/3 · 可见性同步】
 // 验证问题 2 修复: 收起/展开后连线和节点可见性同步（无 rAF 延迟）
 // 已迁移至统一台架 test/helpers/launch.js（样板从 ~35 行减至 ~6 行）
-const { launchBrowser, openApp, sleep, mkNode } = require('./helpers/launch.js');
-let failures = 0;
-const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!cond) failures++; };
+const { launchBrowser, openApp, sleep, mkNode, assertions } = require('./helpers/launch.js');
+const tally = assertions();
+const ok = tally.ok;
 
 (async () => {
   const { browser, cleanup } = await launchBrowser(false);
@@ -57,6 +57,6 @@ const ok = (cond, msg) => { console.log((cond ? '✅ ' : '❌ ') + msg); if (!co
   } finally {
     await cleanup();
   }
-  console.log(failures === 0 ? '\n✅ fold-flush 同步断言全部通过' : '\n❌ ' + failures + ' 项失败');
-  process.exit(failures === 0 ? 0 : 1);
+  console.log(tally.fails === 0 ? '\n✅ fold-flush 同步断言全部通过' : '\n❌ ' + tally.fails + ' 项失败');
+  process.exit(tally.fails === 0 ? 0 : 1);
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1); });

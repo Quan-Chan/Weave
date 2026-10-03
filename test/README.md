@@ -19,7 +19,10 @@ cd test && npm test          # 统一入口: 串行跑全部断言型测试
 | 改某功能域(collapse/region/undo…) | 对应 `npm run test:<域>` | ~1-2min |
 | 改导入/持久化/编辑快捷键 | `npm run test:data-safety` | ~10s |
 | 改恢复工具或本地存档救援 | `npm run test:recovery` | ~15s |
-| 提交前完整回归（含压缩版门禁） | `npm test` | ~5min |
+| 改触控手势 | `npm run test:touch` | ~1min |
+| 改选中逻辑 / 多选模式 | `npm run test:multi` | ~1min |
+| 改 CSS / 弹窗结构 | `npm run test:structure` + `npm run test:layout` | ~1min |
+| 提交前完整回归（含压缩版门禁） | `npm test` | ~8min |
 | 模块化重构前(不常做) | `node test/diff-test.js`(重构前先提交既有改动) | ~3min |
 
 **推荐开发循环**:
@@ -60,15 +63,18 @@ if [ $? -ne 0 ]; then echo "❌ 结构/单测未通过,禁止提交"; exit 1; fi
 `test/helpers/launch.js` 提供浏览器启动/页面就绪/公共交互,新测试应优先复用:
 
 - `launchBrowser(headed)` — 自动 `puppeteer.launch`,失败(沙箱 EPERM)回退手动 spawn+connect,返回 { browser, mode, cleanup }
-- `openApp(browser)` — 打开应用、等就绪、关首启弹窗,返回 { page, cdp }
+- `openApp(browser, opts)` — 打开应用、等就绪、关首启弹窗,返回 { page, cdp }。`clearStorage` 于导航前清空 localStorage；`dismissFirstRun:false` 保留首启弹窗(被测对象是它时用)
+- `openAppTouch(browser, opts)` — 以移动端触控配置打开应用页（导航前调 `enableTouch`），触控手势类测试用它开局
+- `enableTouch(page, cdp, metrics?)` — 设定设备指标并开启触控仿真；`openAppTouch` 内部调用，视口需要自行指定时可直接用
 - `dblClick(page, cdp, x, y)` — CDP 双击(clickCount 1→2)
 - `setupChain(page, nodes, conns)` — 按给定节点与连线布置标准链
 - `mkNode(id,label,x,y)` / `installFactories(page)` — 布置工厂(注入页面级 `__testMk/__testChain/__testReset`)
-- `sleep` / `shotsDir(name)` / `EDGE` / `APP_URL`
+- `sleep(ms)` / `shotsDir(name)` — 延时；截图目录。换浏览器或应用地址用 `WEAVE_EDGE` / `WEAVE_APP_URL` 环境变量，台架不导出解析结果
+- `assertions(prefix?)` — 断言收集器；返回 `{ ok, pass, fails }`，把其中的断言函数取出当本地断言用（`const tally = assertions(); const ok = tally.ok;`）。支持两种调用形态：条件在前 `(cond, msg)`，或名称在前 `(name, cond, extra)`；extra 非 undefined 时在失败行追加 JSON
+- `blankPoint(page)` — 在画布上按网格扫描并返回第一个空白屏幕坐标（避开节点、连线与菜单），供「点空白」类手势使用；找不到返回 null
+- `touchTap()` / `touchDrag()` / `touchLongPress()` / `touchPinch()` / `touchDoubleTap()` — CDP `Input.dispatchTouchEvent` 触摸序列（更底层的 `touchSend` 只在台架内部使用）
 
-已迁移: fold-flush-sync / collapse-edge / fold-click-badge / fold-zoom-twitch / undo-cap / node-drag-snap / data-safety / recovery-tool / min-smoke。
-未迁移(仍自带样板): gui-smoke / region-smoke / collapse-test / hl-smoke /
-hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
+全部 GUI 测试已接入台架，无人再自带 `puppeteer.launch` 样板或自写断言辅助；这条要求由 `check-tests.js` 守护（见下节），也是 `test:fast` 的一部分。新增 GUI 测试必须复用台架，并加入 `npm test` 主链——CI 只跑该链，只加域分组脚本不会被覆盖。
 
 ## 测试
 
@@ -80,6 +86,8 @@ hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 | i18n-keys.js | 静态 | 主程序 I18N 键集、占位符、英文词典与静态引用 | 每次改语言文案或 Weave.html 后 |
 | i18n-recovery.js | 静态 | 恢复页 I18N 键集、占位符、英文无中文、无硬编码中文文案 | 每次改语言文案或 Weave-recovery.html 后 |
 | check-structure.js | 静态 | 模块化结构守护(M01→M13/条目等价) | 每次改 Weave.html 后 |
+| check-module-list.js | 静态 | 头部「模块清单」与各模块 banner 的职责行逐字一致（含 13 个模块齐全） | 改模块职责或头部注释后(`test:modules`) |
+| check-tests.js | 静态 | 测试台架守护:必须走 helpers/launch、不得自带 puppeteer.launch 样板/硬编码浏览器路径/自写断言辅助;文件可编译、台架函数调用已导入;测试文件须进 npm test 主链;台架导出面与本文 API 清单一致且无死导出 | 新增或改测试、改台架或改本文后(`test:tests`) |
 | geom-unit-test.js | 单测 | collapse 闭包/多父冲突纯函数 | 每次改 collapse 逻辑 |
 | gui-smoke.js | 冒烟 | 核心交互主路径(建节点/连线/设置/i18n) | 每次改 Weave.html 后 |
 | data-safety-gui-test.js | 专项 | 导入原子性/只读入口/编辑态快捷键/存储失败提示 | 改导入、快捷键或持久化后 |
@@ -97,6 +105,9 @@ hl-keybind / hl-keybind-ui / snap-reset / repro-bugs。
 | node-drag-snap-test.js | 专项 | 节点拖拽吸附动画/监听泄漏 | 改吸附/动画后(`test:dragsnap`) |
 | undo-cap-test.js | 专项 | 撤销栈 50 步上限 | 改 undo/历史后 |
 | repro-bugs.js | 回归 | 三个历史 bug 不再复现 | 改 collapse/导入/手势后 |
+| touch-smoke-test.js | 专项 | 触控手势（平移/捏合/点选/双击/拖拽/长按菜单/框选/建线/无重复触发/只读） | 改输入手势或触控后（`test:touch`） |
+| multi-select-test.js | 专项 | 多选模式（侧边栏开关/累加选中/平移不清除/空白单击取消/整组拖拽/菜单项移除） | 改选中逻辑或节点拖拽后（`test:multi`） |
+| mobile-layout-test.js | 专项 | 手机布局（竖屏大/小 + 横屏 + 桌面，各弹窗不出屏、设置面板内滚动、顶栏占用、横向滚动；触控在导航前开启） | 改 CSS 或弹窗结构后（`test:layout`） |
 | min-smoke.js | 冒烟 | 压缩发布版启动/建节点/连线/撤销 | 每次改 Weave.html 后 |
 | diff-test.js | 差分 | git HEAD 双页对比(**仅重构前适用**) | 模块化重构前手动 |
 | build-min.js | 工具/门禁 | 生成 Weave.min.html；`--check` 只比较不写入 | 发布及每次完整回归 |
@@ -185,11 +196,11 @@ node test/check-structure.js              # 校验（无参数）
 
 - 脚本语法（`new Function` 编译）
 - 模块 banner 顺序 = M01 → … → M13，且各出现一次
-- DOM id 集合与 golden 一致（104 个）
+- DOM id 集合与 golden 一致（112 个）
 - 常量区 / 尾部区（注释与空白归一化后）逐字一致
 - **App 条目逐条等价** —— 每个方法/状态字段的"名称 + 类型 + 归一化函数体"与 golden 逐一比对
-  （351 条 = 252 方法 + 99 状态字段）
-- `Weave.*` 命名空间成员逐条等价（41 个）
+  （374 条 = 268 方法 + 106 状态字段）
+- `Weave.*` 命名空间成员逐条等价（44 个）
 
 golden.json 的 `movedOut` / `renames` 记录 Phase 2 从 App 提取到 `Weave.Util/Color/Geom`
 的纯函数及其调用点重命名，比对时对 golden 侧应用同样的重命名。
@@ -205,7 +216,7 @@ golden.json 的 `movedOut` / `renames` 记录 Phase 2 从 App 提取到 `Weave.U
 | M05 渲染·节点 | 节点 DOM 创建/更新、renderCanvas 编排、z 序、溢出刷新 | M02, M04 |
 | M06 渲染·连线 | 贝塞尔几何、箭头、SVG 渲染、空间索引、增量平移、分区渲染 | M01, M02 |
 | M07 动画 | 网格吸附动画（240Hz 数据流 + rAF 渲染流） | M02, M05 |
-| M08 输入手势 | 节点拖/线拖/框选/平移/滚轮/键位映射、分区手势、JSON 文件拖拽导入 | M02, M04 |
+| M08 输入手势 | 节点拖/线拖/框选/平移/滚轮/键位映射、分区手势、JSON 文件拖拽导入、触控手势 | M02, M04 |
 | M09 节点编辑 | CRUD、剪贴板、内联编辑、详情弹窗、上下文菜单动作、收起/展开节点串、分区编辑 | M02, M03, M05, M08, M10 |
 | M10 连线编辑 | 创建/删除、曲线手柄、标签编辑、选择维护 | M02, M06 |
 | M11 界面外壳 | 右键菜单、关于/设置弹窗、键位录制、专注模式、状态徽标、Σ 彩蛋 | M02, M08, M09, M10 |

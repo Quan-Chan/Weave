@@ -1,7 +1,7 @@
 'use strict';
 // 收起功能边缘场景：撤销/重做、删除收起根、JSON 序列化往返。
 // 已迁移至统一台架 test/helpers/launch.js
-const { launchBrowser, openApp, sleep, mkNode } = require('./helpers/launch.js');
+const { launchBrowser, openApp, sleep, mkNode, setupChain } = require('./helpers/launch.js');
 const fail = msg => { throw new Error(msg); };
 
 (async () => {
@@ -10,17 +10,10 @@ const fail = msg => { throw new Error(msg); };
   const { page } = await openApp(browser);
 
   // ── 布置：A → B → C ──
-  await page.evaluate(() => {
-    const mk = (label, x, y) => ({ id: 'x_' + label, label, desc: '', color: 'blue', x, y, mirrored: false, w: 170, h: 80 });
-    App.canvasState.nodes = [mk('A', 0, 0), mk('B', 320, 0), mk('C', 640, 0)];
-    App.canvasState.connections = [
-      { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false },
-      { id: 'c_BC', from: 'x_B', to: 'x_C', label: '', mirrored: false }
-    ];
-    App._nodeZOrder = App.canvasState.nodes.map(n => n.id);
-    App.saveCanvasSnapshot();
-    App.renderCanvas();
-  });
+  await setupChain(page, [mkNode('x_A', 'A', 0, 0), mkNode('x_B', 'B', 320, 0), mkNode('x_C', 'C', 640, 0)], [
+    { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false },
+    { id: 'c_BC', from: 'x_B', to: 'x_C', label: '', mirrored: false }
+  ]);
   await sleep(300);
 
   // ── 1) 撤销/重做 ──

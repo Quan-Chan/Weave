@@ -39,6 +39,9 @@
 | 收起功能 | cd test && npm run test:collapse |
 | 导入/持久化/编辑快捷键 | cd test && npm run test:data-safety |
 | 恢复工具/本地存档救援 | cd test && npm run test:recovery |
+| 触控手势 | cd test && npm run test:touch |
+| 选中逻辑 / 多选模式 | cd test && npm run test:multi |
+| CSS / 弹窗结构 | cd test && npm run test:layout |
 | 分区功能 | cd test && npm run test:region |
 | fold 渲染族 | cd test && npm run test:fold |
 | 关联高亮 | cd test && npm run test:hl |
@@ -55,6 +58,9 @@ npm scripts 与测试文件的对应关系：
 - test:collapse = collapse-test.js + collapse-edge-test.js
 - test:data-safety = data-safety-gui-test.js
 - test:recovery = recovery-tool-test.js
+- test:touch = touch-smoke-test.js
+- test:multi = multi-select-test.js
+- test:layout = mobile-layout-test.js
 - test:region = region-smoke.js
 - test:fold = fold-click-badge-test.js + fold-flush-sync-test.js + fold-zoom-twitch-test.js
 - test:hl = hl-smoke.js + hl-keybind-test.js + hl-keybind-ui-test.js
@@ -62,7 +68,9 @@ npm scripts 与测试文件的对应关系：
 - test:dragsnap = node-drag-snap-test.js
 - test:undo = undo-cap-test.js
 - test:repro = repro-bugs.js
-- test:fast = check-version.js + geom-unit-test.js + i18n-keys.js + check-structure.js
+- test:fast = check-version.js + check-tests.js + check-module-list.js + geom-unit-test.js + i18n-keys.js + check-structure.js
+- test:tests = check-tests.js
+- test:modules = check-module-list.js
 - test:version = check-version.js
 - test:i18n = i18n-keys.js
 - test:min = build-min.js --check + min-smoke.js
@@ -76,7 +84,7 @@ diff-test.js 在模块化重构前对 git HEAD 原版与工作区逐步比对。
 新功能的测试：
 
 - 文件命名 {功能}-{层级}-test.js，层级取值为 gui、region、collapse、undo 等测试类别，现有文件清单与命名例外见 ../test/README.md
-- 复用 test/helpers/launch.js 的 launchBrowser、openApp、dblClick、installFactories
+- 必须复用 test/helpers/launch.js 的 launchBrowser、openApp、dblClick、installFactories，不得自带浏览器启动样板或硬编码浏览器路径；该要求由 test/check-tests.js 守护
 - 加入 test/package.json 的 scripts.test 与对应域分组脚本
 
 ## 优化代码质量

@@ -7,17 +7,14 @@ const os = require('os');
 const path = require('path');
 const { pathToFileURL } = require('url');
 const vm = require('vm');
-const { launchBrowser } = require('./helpers/launch');
+const { launchBrowser, assertions } = require('./helpers/launch');
 
 const ROOT = path.join(__dirname, '..');
 const TOOL_FILE = path.join(ROOT, 'APPs', 'Weave-recovery.html');
 const TOOL_URL = pathToFileURL(TOOL_FILE).href;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-let failures = 0;
-function ok(cond, msg) {
-  console.log((cond ? '  ✅ ' : '  ❌ ') + msg);
-  if (!cond) failures++;
-}
+const tally = assertions();
+const ok = tally.ok;
 async function waitText(page, id, needle, timeout = 10000) {
   await page.waitForFunction((i, n) => {
     const el = document.getElementById(i);
@@ -180,6 +177,63 @@ async function waitText(page, id, needle, timeout = 10000) {
       const sameDefaults = Object.keys(appDefaults).length === Object.keys(recoveryDefaults).length &&
         Object.keys(appDefaults).every(action => JSON.stringify(appDefaults[action]) === JSON.stringify(recoveryDefaults[action]));
       ok(sameDefaults, '恢复页 10 项默认键位与主程序逐项一致');
+    }
+    // 设置链同样是镜像：主程序 App._settings 与恢复页 BOOL_DEFAULTS/SETTING_KEYS/ALIGN_KEYS
+    // 各维护一份。登记键、布尔键与默认值必须逐项一致，否则两页对同一份数据的解读会分叉。
+    const appSettingsMatch = appSource.match(/(?:App\._settings = |^  _settings: )(\{[\s\S]*?\n    \})/m);
+    const appAlignMatch = appSource.match(/_snapToggleDefs:\s*(\[[\s\S]*?\n  \])/);
+    const appAlignKeys = appAlignMatch ? Array.from(appAlignMatch[1].matchAll(/store:\s*'([^']+)'/g), m => m[1]) : [];
+    const appSettingEntries = appSettingsMatch ?
+      Array.from(appSettingsMatch[1].matchAll(/(\w+):\s*\{\s*key:\s*'([^']+)',\s*def:\s*([^}\s]+)/g),
+        m => ({ name: m[1], key: m[2], def: m[3] })) : [];
+    const recBoolMatch = source.match(/var BOOL_DEFAULTS=(\{[\s\S]*?\});/);
+    const recSettingKeysMatch = source.match(/var SETTING_KEYS=Object\.keys\(BOOL_DEFAULTS\)\.concat\((\[[\s\S]*?\])\);/);
+    const recAlignMatch = source.match(/var ALIGN_KEYS=(\[[\s\S]*?\]);/);
+    // 恢复页把主程序存储键提成了 KEY_* 常量，SETTING_KEYS 里是标识符而非字面量：
+    // 先解析键名常量表，再把标识符还原成键字符串。
+    const recKeyConsts = new Map(Array.from(source.matchAll(/var (KEY_\w+)\s*=\s*'([^']+)'/g), m => [m[1], m[2]]));
+    // SETTING_KEYS = Object.keys(BOOL_DEFAULTS).concat([...])：整条表达式求值才
+    // 得到真实范围。只在空上下文里求值 concat 的数组部分，Object.keys 会得到空
+    // 数组，使「复位可覆盖全部设置」断言退化成无意义的子集检查。
+    const extraKeyNames = recSettingKeysMatch && recBoolMatch
+      ? Array.from(vm.runInNewContext(
+          'Object.keys(' + recBoolMatch[1] + ').concat(' +
+          recSettingKeysMatch[1].replace(/\b(KEY_\w+)\b/g, "'$1'") + ')'))
+      : null;
+    const recExtraKeys = extraKeyNames ? extraKeyNames.map(k => recKeyConsts.get(k) || k) : null;
+    ok(appSettingEntries.length > 0 && appAlignKeys.length > 0 && !!recBoolMatch && !!recExtraKeys && !!recAlignMatch,
+      '可读取主程序与恢复页的设置清单');
+    if (appSettingEntries.length && appAlignKeys.length && recBoolMatch && recExtraKeys && recAlignMatch) {
+      const recBool = vm.runInNewContext('(' + recBoolMatch[1] + ')');
+      const recAlignKeys = vm.runInNewContext('(' + recAlignMatch[1] + ')');
+      const appBool = new Map(appSettingEntries.filter(e => e.def === 'true' || e.def === 'false')
+        .map(e => [e.key, e.def === 'true' ? '1' : '0']));
+      const sameBoolKeys = appBool.size === Object.keys(recBool).length &&
+        [...appBool].every(([k, v]) => recBool[k] === v);
+      ok(sameBoolKeys, '恢复页布尔设置键与默认值与主程序逐项一致（' + appBool.size + ' 项）');
+      ok(appSettingEntries.every(e => e.key in recBool || recExtraKeys.includes(e.key)),
+        '恢复页登记了主程序全部设置键（复位可覆盖）');
+      // 反向核对：恢复页的布尔开关必须与主程序的布尔设置键逐一对应，
+      // 且 HTML 里的 data-bool 与 BOOL_DEFAULTS 键集一致（不重不漏）。
+      // 只做子集检查时，多写或漏写一个开关都不会被发现。
+      const recBoolKeys = Object.keys(recBool);
+      const extraBoolKeys = recBoolKeys.filter(k => !appBool.has(k));
+      ok(extraBoolKeys.length === 0,
+        '恢复页布尔开关未超出主程序的布尔设置键' + (extraBoolKeys.length ? '（多出 ' + extraBoolKeys.join(', ') + '）' : ''));
+      const htmlBoolKeys = Array.from(source.matchAll(/data-bool="([^"]+)"/g), m => m[1]).sort();
+      const boolDefaultKeys = recBoolKeys.slice().sort();
+      ok(JSON.stringify(htmlBoolKeys) === JSON.stringify(boolDefaultKeys),
+        '恢复页 HTML 开关与 BOOL_DEFAULTS 键集一致（各 ' + htmlBoolKeys.length + ' 项）');
+      // SETTING_KEYS 是「重置全部设置」的作用范围，必须覆盖 HTML 出现的每一个开关。
+      const uncovered = htmlBoolKeys.filter(k => !recExtraKeys.includes(k));
+      ok(uncovered.length === 0,
+        'SETTING_KEYS 覆盖全部 HTML 开关' + (uncovered.length ? '（缺 ' + uncovered.join(', ') + '）' : ''));
+      // _snapToggleDefs 存的是设置表行名（snapNodes），恢复页存的是 localStorage 键
+      // （flow_snap_nodes）：先经 _settings 表映射成键再比较。
+      const keyOfName = new Map(appSettingEntries.map(e => [e.name, e.key]));
+      const appAlignStoreKeys = appAlignKeys.map(n => keyOfName.get(n) || n);
+      ok(JSON.stringify(recAlignKeys) === JSON.stringify(appAlignStoreKeys),
+        '恢复页「重置对齐设置」的键表与主程序 _snapToggleDefs 一致');
     }
     ok(!source.includes('localStorage.clear('), '不使用 localStorage.clear()');
 
@@ -480,15 +534,15 @@ async function waitText(page, id, needle, timeout = 10000) {
 
     ok(pageErrors.length === 0, '页面无未捕获脚本错误' + (pageErrors.length ? ': ' + pageErrors.join(' | ') : ''));
     await page.close();
-    exitCode = failures === 0 ? 0 : 1;
+    exitCode = tally.fails === 0 ? 0 : 1;
   } catch (e) {
     console.error('FAIL:', e && e.stack ? e.stack : e);
-    failures++;
+    tally.fails++;
     exitCode = 1;
   } finally {
     if (tempDir) { try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {} }
     try { await browserHandle.cleanup(); } catch (e) {}
   }
-  console.log(failures === 0 ? '\n✅ 恢复与设置测试通过' : '\n❌ 恢复与设置测试失败 ' + failures + ' 项');
+  console.log(tally.fails === 0 ? '\n✅ 恢复与设置测试通过' : '\n❌ 恢复与设置测试失败 ' + tally.fails + ' 项');
   process.exit(exitCode);
 })().catch(e => { console.error('FAIL:', e); process.exit(1); });

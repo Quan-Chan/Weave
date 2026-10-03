@@ -1,19 +1,13 @@
 // Weave GUI 冒烟测试（puppeteer-core + 系统 Edge 无头）
 // 用法: node test/gui-smoke.js [--headed]
-const puppeteer = require('puppeteer-core');
 const path = require('path');
 const fs = require('fs');
-const { pathToFileURL } = require('url');
+const { sleep, launchBrowser, openApp } = require('./helpers/launch');
 
-// 浏览器可执行文件: 环境变量优先(CI 用), 缺省回退本机 Edge
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-// 应用地址: 相对 test/ 定位仓库内 APPs/Weave.html(可移植, 不依赖作者磁盘路径)
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
 const SHOTS = path.join(__dirname, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
 const HEADED = process.argv.includes('--headed');
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 let step = 0;
 const shot = async (page, name) => {
   step++;
@@ -23,18 +17,10 @@ const shot = async (page, name) => {
 };
 
 (async () => {
-  const browser = await puppeteer.launch({
-    executablePath: EDGE,
-    headless: !HEADED,
-    args: ['--no-first-run', '--no-sandbox', '--disable-gpu', '--window-size=1280,800'],
-    defaultViewport: { width: 1280, height: 800 }
-  });
-  const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: 'load' });
-
-  // 等待 App 就绪
-  await page.waitForFunction('!!window.App && !!document.getElementById("canvasStage") && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(600);
+  const { browser, cleanup } = await launchBrowser(HEADED);
+  // 清空存储以回到真正的首次启动状态：首启弹窗是下面第 0 步的被测对象，
+  // 因此不能交由台架自动关闭（dismissFirstRun: false）。
+  const { page } = await openApp(browser, { clearStorage: true, dismissFirstRun: false });
   console.log('✅ 应用加载完成');
 
   // ── 0) 首次启动：自动弹出设置弹窗并定位到键位设置 ──
@@ -282,7 +268,7 @@ const shot = async (page, name) => {
   await page.keyboard.press('Escape');
   await sleep(200);
 
-  // ── 6b) 内联编辑：双击节点标题 → 修改 → 点空白保存 ──
+  // ── 6c) 内联编辑：双击节点标题 → 修改 → 点空白保存 ──
   const titlePos = await page.evaluate(() => {
     const el = App._nodeElMap.get(App.canvasState.nodes[0].id);
     const h = el.querySelector('.node-header').getBoundingClientRect();
@@ -298,14 +284,51 @@ const shot = async (page, name) => {
   await page.keyboard.up('Control');
   await page.keyboard.type('自动化标题');
   await sleep(200);
-  await shot(page, '09b_inline_edit');
+  await shot(page, '09c_inline_edit');
   // 点空白保存
   await page.mouse.click(cx, cy + 250);
   await sleep(300);
   const label = await page.evaluate('App.canvasState.nodes[0].label');
   console.log('保存后标题:', label);
   if (label !== '自动化标题') throw new Error('内联编辑保存失败: ' + label);
-  await shot(page, '09c_inline_saved');
+  await shot(page, '09d_inline_saved');
+
+  // ── 6d) 遮罩空白点击关闭弹窗 ──
+  // 三个弹窗共用同一段遮罩点击逻辑（OVERLAY_DISMISS）。节点详情弹窗历史上
+  // 没有该行为——点遮罩只验证它不关，防止统一时被顺手"补上"而无人察觉。
+  const overlayCases = [
+    { id: 'settingsModal', open: 'App.showSettings()', closeCheck: 'App.closeSettings()' },
+    { id: 'cpModal', open: 'App._gOpenCustomPicker ? App._gOpenCustomPicker() : App.openCustomPicker()', closeCheck: 'App.cancelCustomPicker()' },
+    // 分区弹窗需要真实分区才有内容；本测试此前不建分区，这里临时补一个
+    { id: 'regionModal', open: "App.openRegionModal(App.canvasState.regions[0].id)", closeCheck: 'App.closeRegionModal(); App.canvasState.regions = []; App.renderCanvas();',
+      before: 'App.canvasState.regions = [{ id: "rg_overlay", label: "R", color: "blue", x: -300, y: -200, w: 600, h: 400, nodeIds: [], parentId: null }]; App.renderCanvas();' }
+  ];
+  for (const c of overlayCases) {
+    await page.evaluate(`(function(){ ${c.closeCheck}; })()`);
+    if (c.before) await page.evaluate(`(function(){ ${c.before} })()`);
+    await page.evaluate(`(function(){ ${c.open}; })()`);
+    await sleep(250);
+    if (!await page.evaluate(`document.getElementById('${c.id}').classList.contains('on')`)) {
+      throw new Error(c.id + ' 未能打开，无法验证遮罩点击');
+    }
+    // 屏幕左上角必定落在遮罩上而非弹窗盒内（弹窗居中，最宽 720px）
+    await page.mouse.click(20, 20);
+    await sleep(250);
+    if (await page.evaluate(`document.getElementById('${c.id}').classList.contains('on')`)) {
+      throw new Error(c.id + ' 点遮罩空白未关闭');
+    }
+  }
+  await page.evaluate('App.openNodeModal(App.canvasState.nodes[0].id)');
+  await sleep(250);
+  await page.mouse.click(20, 20);
+  await sleep(250);
+  if (!await page.evaluate(`document.getElementById('modal').classList.contains('on')`)) {
+    throw new Error('节点详情弹窗不应在点遮罩时关闭（历史行为）');
+  }
+  await page.evaluate('App.closeModal()');
+  await sleep(200);
+  console.log('遮罩点击关闭: 3 个弹窗关闭、节点详情保持');
+  await shot(page, '09e_overlay_dismiss');
 
   // ── 7) Ctrl+H 隐藏顶层 UI ──
   const canvasSizeBefore = await page.evaluate(`document.getElementById('canvasStage').clientWidth`);
@@ -345,8 +368,33 @@ const shot = async (page, name) => {
   console.log('最终状态:', JSON.stringify(summary));
   await shot(page, '12_final');
 
+  // ── 9) Σ 彩蛋的键盘可达性 ──
+  // 放在最后：startEasterEgg 会往画布吐一个节点，放前面会破坏上面的最终断言。
+  // 两个入口共用一张 BIND_KEYS 表（Enter/Space 触发），这里各验一次。
+  // aboutSigma 位于设置弹窗的「软件详情」页（默认 display:none），
+  // 隐藏元素无法获得焦点，必须先打开该页再按键。
+  await page.evaluate("document.getElementById('brandSigma').focus()");
+  await page.keyboard.press('Enter');
+  await sleep(80);
+  if (!await page.evaluate("document.getElementById('brandSigma').classList.contains('egg-active')")) {
+    throw new Error('brandSigma 按 Enter 未触发彩蛋');
+  }
+  await sleep(1400);   // 等彩蛋吐完节点，避免带着动画状态进入下一项
+  await page.evaluate("App.showSettings(); App._showSettingsTab('about');");
+  await sleep(250);
+  await page.evaluate("document.getElementById('aboutSigma').focus()");
+  await page.keyboard.press(' ');
+  await sleep(80);
+  if (!await page.evaluate('!!App._aboutSpinRunning')) {
+    throw new Error('aboutSigma 按空格未触发旋转');
+  }
+  await page.evaluate('App.closeSettings()');
+  await sleep(200);
+  console.log('Σ 键盘可达性: brandSigma(Enter) / aboutSigma(Space) 均触发');
+  await shot(page, '13_sigma_keys');
+
   console.log('✅ 冒烟测试全部通过');
-  await browser.close();
+  await cleanup();
   process.exit(0);
 })().catch(e => { console.error('❌ 测试失败:', e.message); process.exit(1); });
 

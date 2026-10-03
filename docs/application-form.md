@@ -49,6 +49,30 @@ APPs/Weave.html 的浏览器兼容性说明见 ../UnsupportedBrowsers/README.md�
 
 单位：内存与交互中的 x、y、w、h 为世界像素。序列化存档中的 x、y、w、h（节点与分区）与 collapse.dx、collapse.dy 为格单位，1 格 = GRID_PX 像素，加载时乘以 GRID_PX 还原。连线的 cp1、cp2 是世界像素偏移，不参与折算。坐标 HUD 以格为单位显示与编辑；网格吸附在开启对齐设置时为 1 格，关闭时为 1 像素。
 
+## 界面适配
+
+响应式断点按**可用空间**取，不只看宽度：
+
+| 断点 | 场景 | 关键处理 |
+|---|---|---|
+| `max-width:820px` | 平板/手机竖屏 | 顶栏换行、命中区 44px、弹窗近全屏、设置导航转横排 |
+| `max-width:520px` | 手机竖屏 | 侧边栏转顶部横条、顶栏字号与内边距压缩 |
+| `max-height:620px` | 任何矮视口（**含手机横屏**） | 关闭 `.modal-box` 的 `scale(1.25)`、设置弹窗改纵向自适应、顶栏压成单行可横向滚动、侧边栏恢复右侧竖排 |
+| `max-height:480px` | 手机横屏 | 进一步压缩导航与行高，把高度让给画布 |
+| `orientation:landscape and min-height:481px` | 平板/桌面横屏 | 设置弹窗放宽到 720px |
+
+手机横屏的宽度常大于 820（iPhone 16 Pro Max 横屏为 956×440），只按宽度设断点会让整段移动端规则失效——弹窗按桌面尺寸渲染，再被 `scale(1.25)` 放大，在 440 高的屏幕上双向出屏。故必须有 `max-height` 分支。
+
+`.settings-panels` 上的 `min-height:0` 不可省：设置弹窗在窄屏改为纵向排布后 `flex:1` 作用在垂直轴，而 flex 项默认 `min-height:auto` 无法收缩到内容高度以下，面板会被内容撑破容器。
+
+viewport 声明 `viewport-fit=cover`，配合 `env(safe-area-inset-*)` 让顶栏与侧边栏避开刘海与圆角；不设 `user-scalable=no`，保留用户缩放能力。
+
+安全区避让是无条件规则，放在 CSS 1 末尾、全部断点之前。`.header` 用 `padding-inline`、`.sidebar` 用 `padding-inline` 与 `padding-block` 写出：断点用 `padding` 简写覆盖内边距，两者同特异性，源序在后的一方获胜，无条件规则排在断点之后会让断点声明的内边距失效。
+
+四个弹窗遮罩的 `z-index` 一律显式写出（`#modal` 300、`#cpModal` 400、`#settingsModal` 350、`#regionModal` 360）。缺省为 `auto` 时遮罩会排在顶栏（`z-index:100`）之下，顶栏覆盖的一条区域内点遮罩不关闭、也点不到弹窗顶部内容。
+
+守护见 test/mobile-layout-test.js。
+
 ## 渲染结构
 
 画布元素自 #canvasStage 起嵌套，缩放层位于平移层内部，scale 叠加在 translate 之上：
@@ -87,7 +111,7 @@ APPs/Weave.html 的浏览器兼容性说明见 ../UnsupportedBrowsers/README.md�
 | M05 渲染·节点 | 节点 DOM 创建/更新、renderCanvas 编排、z 序、溢出刷新、关联高亮模糊 | M02, M04 |
 | M06 渲染·连线 | 贝塞尔几何、箭头、SVG 渲染、空间索引、增量平移、分区渲染 | M01, M02 |
 | M07 动画 | 网格吸附动画（240Hz 数据流 + rAF 渲染流） | M02, M05 |
-| M08 输入手势 | 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射、分区手势、文件拖拽导入 | M02, M04 |
+| M08 输入手势 | 节点拖/线拖/框选/平移/滚轮/单击双击/键位映射、分区手势、文件拖拽导入、指针手势（触控/触控笔） | M02, M04 |
 | M09 节点编辑 | CRUD、剪贴板、内联编辑、描述浮层、详情弹窗、上下文菜单动作、收起/展开节点串、分区编辑 | M02, M03, M05, M08, M10 |
 | M10 连线编辑 | 创建/删除、曲线手柄、标签编辑、选择维护 | M02, M06 |
 | M11 UI 外壳 | 右键菜单、关于/设置弹窗、键位录制、专注模式、状态徽标、Σ 彩蛋 | M02, M08, M09, M10 |
@@ -101,6 +125,34 @@ APPs/Weave.html 的浏览器兼容性说明见 ../UnsupportedBrowsers/README.md�
 - 纯函数放入 Weave.Util、Weave.Color、Weave.Geom 命名空间
 - App 内部状态与方法以下划线前缀命名
 - 箭头方向实时取自两端节点的 node.mirrored。conn.mirrored 是持久化的派生记录，值为输出端节点的镜像状态，渲染不读取
+
+## 输入手势
+
+鼠标手势与触控手势并存，互不干扰：画布在触控指针按下起即 preventDefault，浏览器不再合成鼠标事件，因此不存在双重触发。
+
+触控手势层实现于 Pointer Events（`pointerdown/pointermove/pointerup/pointercancel`），`pointerType === 'mouse'` 一律放行给既有鼠标处理器，只有 touch/pen 进入指针层。MDN 规定混合鼠标/触控输入应使用 Pointer Events。
+
+触控不另写一套拖拽实现。既有手势代码只读事件上的 clientX/clientY 与修饰键，对事件类型无假设，故有两个转换点：
+
+- `_bindDragListeners` 同时绑定 mousemove/mouseup 与 pointermove/pointerup/pointercancel（指针事件归一为同构的 `{clientX, clientY}`，且过滤 `pointerType === 'mouse'`，否则真实鼠标的同一次物理移动会被应用两遍）——节点拖拽、连接点建线、调整手柄、分区移动因此在触控下原样工作
+- `App._touchFire` 补发同构的合成鼠标事件——手势起手补发 mousedown，点击补发 mousedown → mouseup → click，双击追加 dblclick，长按补发 contextmenu
+
+单指一次按压的三态分界共用同一次 pointerdown：位移超过 `TOUCH_DRAG_SLOP` → 真实拖拽；按住 `TOUCH_LONGPRESS_MS` 不动 → 长按弹菜单；抬手且前两者皆未发生 → 点击，窗口内的第二次为双击。双指为捏合缩放并平移。按下即 `setPointerCapture`，拖拽在手指滑出画布后不中断。
+
+触控补齐的操作（触屏无修饰键、无右键、无滚轮、无物理键盘）：
+
+| 桌面操作 | 触控入口 |
+|---|---|
+| 右键菜单 | 长按节点 / 连线 / 分区；长按空白弹画布菜单（粘贴、全选、框选模式、适应视图） |
+| Ctrl + 单击（多选） | 侧边栏「多选模式」开关，开启后点按节点累加/移出选中 |
+| Alt + 单击（关联高亮） | 节点菜单「高亮关联节点」 |
+| Shift + 拖拽（框选） | 侧边栏「框选」模式开关，开启后单指拖拽空白 |
+| 滚轮（缩放） | 双指捏合 |
+| Ctrl + 滚轮（换色） | 顶栏「颜色」按钮 |
+
+仅空白画布一路（平移、框选、分区预览，驱动位于 M13 尾部的 document mousemove）需由 `_ptrMove` 补发 mousemove；其余手势各自已接管 pointermove，补发会造成重复位移。
+
+长按菜单有两处配套处理：菜单下移避开指尖；`_ctxGuardUntil` 窗口内"没有前置 pointerdown"的 click 视为浏览器补发并拦下——用户点菜单项必然先有 pointerdown，不受影响。
 
 ## 结构守护
 

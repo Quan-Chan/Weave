@@ -1,24 +1,12 @@
 'use strict';
 // 常规页「重置对齐设置」冒烟 v2：直接方法调用 + UI 点击双路径
-const puppeteer = require('puppeteer-core');
-const path = require('path');
-const { pathToFileURL } = require('url');
-const EDGE = process.env.WEAVE_EDGE || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
-const APP_URL = process.env.WEAVE_APP_URL || pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.html')).href;
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let fails = 0;
-const ok = (c, m) => { console.log((c ? '  ✅ ' : '  ❌ ') + m); if (!c) fails++; };
+const { sleep, launchBrowser, openApp, assertions } = require('./helpers/launch');
+const tally = assertions();
+const ok = tally.ok;
 (async () => {
-  const browser = await puppeteer.launch({ executablePath: EDGE, headless: true,
-    args: ['--no-first-run', '--no-sandbox', '--disable-gpu', '--window-size=1280,800'], defaultViewport: { width: 1280, height: 800 } });
-  const page = await browser.newPage();
-  await page.goto(APP_URL, { waitUntil: 'load' });
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForFunction('!!window.App && document.getElementById("canvasStage").clientWidth > 0', { timeout: 15000 });
-  await sleep(500);
-  const open = await page.evaluate('document.getElementById("settingsModal").classList.contains("on")');
-  if (open) { await page.keyboard.press('Escape'); await sleep(150); }
+  const { browser, cleanup } = await launchBrowser(false);
+  // 原样板先 clear 再 reload，为的是拿到出厂默认；台架的 clearStorage 等价。
+  const { page } = await openApp(browser, { clearStorage: true });
   const def = await page.evaluate(() => ({
     snapNodes: App._snapNodes, snapSize: App._snapSize,
     snapRegionPos: App._snapRegionPos, snapRegionSize: App._snapRegionSize
@@ -56,7 +44,7 @@ const ok = (c, m) => { console.log((c ? '  ✅ ' : '  ❌ ') + m); if (!c) fails
   await sleep(600);
   const persist = await page.evaluate(() => ({ s: App._snapSize, rs: App._snapRegionSize, sn: App._snapNodes, rp: App._snapRegionPos }));
   ok(persist.sn && persist.s && persist.rp && persist.rs, '刷新后仍全开: ' + JSON.stringify(persist));
-  console.log(fails === 0 ? '✅ 重置对齐设置冒烟通过' : '❌ 失败 ' + fails);
-  await browser.close();
-  process.exit(fails === 0 ? 0 : 1);
+  console.log(tally.fails === 0 ? '✅ 重置对齐设置冒烟通过' : '❌ 失败 ' + tally.fails);
+  await cleanup();
+  process.exit(tally.fails === 0 ? 0 : 1);
 })().catch(e => { console.error('💥', e); process.exit(2); });

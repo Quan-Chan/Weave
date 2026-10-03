@@ -5,13 +5,10 @@ const { pathToFileURL } = require('url');
 
 const MIN_URL = pathToFileURL(path.join(__dirname, '..', 'APPs', 'Weave.min.html')).href;
 process.env.WEAVE_APP_URL = MIN_URL;
-const { launchBrowser, openApp, dblClick } = require('./helpers/launch.js');
+const { launchBrowser, openApp, dblClick, assertions } = require('./helpers/launch.js');
 
-let failures = 0;
-const ok = (condition, message) => {
-  console.log((condition ? '✅ ' : '❌ ') + message);
-  if (!condition) failures++;
-};
+const tally = assertions();
+const ok = tally.ok;
 
 (async () => {
   const launched = await launchBrowser(process.argv.includes('--headed'));
@@ -56,8 +53,8 @@ const ok = (condition, message) => {
     await launched.cleanup();
   }
 
-  console.log(failures === 0 ? '\n✅ Weave.min.html 核心冒烟通过' : '\n❌ Weave.min.html 核心冒烟 ' + failures + ' 项失败');
-  process.exitCode = failures === 0 ? 0 : 1;
+  console.log(tally.fails === 0 ? '\n✅ Weave.min.html 核心冒烟通过' : '\n❌ Weave.min.html 核心冒烟 ' + tally.fails + ' 项失败');
+  process.exitCode = tally.fails === 0 ? 0 : 1;
 })().catch(err => {
   console.error('压缩版冒烟异常:', err && err.stack ? err.stack : err);
   process.exitCode = 1;

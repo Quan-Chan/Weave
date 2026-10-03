@@ -1,25 +1,20 @@
-
 'use strict';
 // 【fold 渲染回归族 1/3 · 徽标点击/拖拽显隐】
 // 验证: 点击(不拖拽)时 fold 徽标保持可见(不误触收起);真拖拽时徽标保持可见(socket 仅放大)
 // 已迁移至统一台架 test/helpers/launch.js
-const { launchBrowser, openApp, sleep } = require('./helpers/launch.js');
+const { launchBrowser, openApp, sleep, setupChain, mkNode, assertions } = require('./helpers/launch.js');
+const tally = assertions();
+const ok = tally.ok;
 (async () => {
   const { browser, cleanup } = await launchBrowser(false);
   let exitCode = 1;   // try 外声明,finally 后退出用
   try {
   const { page } = await openApp(browser);
-  await page.evaluate(() => {
-    const mk = (label, x, y) => ({ id: 'x_' + label, label, desc: '', color: 'blue', x, y, mirrored: false, w: 170, h: 80 });
-    App.canvasState.nodes = [mk('A', 0, 0), mk('B', 320, 0), mk('C', 640, 0)];
-    App.canvasState.connections = [
-      { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false },
-      { id: 'c_BC', from: 'x_B', to: 'x_C', label: '', mirrored: false }
-    ];
-    App._nodeZOrder = App.canvasState.nodes.map(n => n.id);
-    App.saveCanvasSnapshot();
-    App.renderCanvas();
-  });
+  // A→B→C 标准链：建、连线、z 序与快照由台架 setupChain 统一完成
+  await setupChain(page, [mkNode('x_A', 'A', 0, 0), mkNode('x_B', 'B', 320, 0), mkNode('x_C', 'C', 640, 0)], [
+    { id: 'c_AB', from: 'x_A', to: 'x_B', label: '', mirrored: false },
+    { id: 'c_BC', from: 'x_B', to: 'x_C', label: '', mirrored: false }
+  ]);
   await sleep(300);
   await page.evaluate(() => { App.centerCanvasOnNodes(); });
   await sleep(400);
