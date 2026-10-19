@@ -98,12 +98,12 @@ async function waitText(page, id, needle, timeout = 10000) {
       clearInViewport: document.getElementById('btnClearGraph').getBoundingClientRect().bottom <= window.innerHeight
     }));
     ok(boot.reads === 1 && boot.parses === 0, '启动只读取一次节点图大小，不解析大 JSON');
-    ok(/MB$/.test(boot.graphSize), '启动即显示节点图数据大小：' + boot.graphSize);
+    ok(/MB$/.test(boot.graphSize), '启动即显示画布数据大小：' + boot.graphSize);
     ok(boot.settingsSize !== '—' && boot.totalSize !== '—', '启动即显示设置大小与 Weave 合计');
-    ok(boot.clearText === '清空节点图', '主界面显示“清空节点图”操作');
+    ok(boot.clearText === '清空画布数据', '主界面显示“清空画布数据”操作');
     ok(boot.sourceInfo === '当前查看：本地文件数据（file:）', '本地恢复页声明当前查看的是本地文件数据');
     ok(boot.bucketNote.includes('只显示并修改上面这一份数据'), '声明本页操作只作用于当前这一份数据');
-    ok(boot.ioHint.includes('上面声明的那一份节点图'), '导入导出区指向当前声明的那份数据');
+    ok(boot.ioHint.includes('上面声明的那一份'), '导入导出区指向当前声明的那份数据');
 
     // 语言：与主程序共用 flow_lang，英文界面下全页文案同步切换。
     const zhText = await page.evaluate(() => ({
@@ -137,7 +137,7 @@ async function waitText(page, id, needle, timeout = 10000) {
       })()
     }));
     ok(enText.htmlLang === 'en' && enText.title === 'Weave Recovery & Settings', '切换英文后标题与 html lang 同步');
-    ok(enText.clearBtn === 'Clear graph' && enText.hints.every(h => !/[㐀-鿿]/.test(h)), '英文界面按钮与全部提示文案已切换');
+    ok(enText.clearBtn === 'Clear canvas data' && enText.hints.every(h => !/[㐀-鿿]/.test(h)), '英文界面按钮与全部提示文案已切换');
     ok(enText.keyNames.length === 10 && enText.keyNames[0] === 'Undo' && enText.keyNames[9] === 'Delete selection', '英文下 10 项键位名称正确');
     ok(enText.sourceInfo === 'Now viewing: local file data (file:)', '英文下仍声明当前查看的数据来源');
     ok(enText.cjkLeft.length === 0, '英文界面无残留中文（语言按钮标签除外）: ' + (enText.cjkLeft.join(' | ') || '无'));
@@ -311,9 +311,9 @@ async function waitText(page, id, needle, timeout = 10000) {
     }), flowDataBeforeKeybindReset);
     ok(resetKeybinds.raw === '' && resetKeybinds.undo === 'Ctrl+Z' && resetKeybinds.dataUnchanged, '重置键位恢复内置值且不影响节点图数据');
 
-    // 清空节点图，设置保留。
+    // 清空画布数据（两份存档），设置保留。
     await page.click('#btnClearGraph');
-    await waitText(page, 'graphStatus', '节点图数据已清空');
+    await waitText(page, 'graphStatus', '画布数据已清空');
     const afterClear = await page.evaluate(() => ({
       data: localStorage.getItem('flow_data'),
       lang: localStorage.getItem('flow_lang'),
@@ -323,6 +323,26 @@ async function waitText(page, id, needle, timeout = 10000) {
     ok(afterClear.data === null, '清空节点图后 flow_data 不存在');
     ok(afterClear.lang === 'zh' && afterClear.gen === 'green', '清空节点图不会删除软件设置');
     ok(afterClear.size === '0 B', '清空后占用立即更新为 0 B');
+
+    // 只剩时序图存档时，占用与状态行都必须认这一份——不能显示"未保存"，
+    // 也不能把这份占用的来源说成节点图。
+    await page.evaluate(() => localStorage.setItem('flow_data_seq', JSON.stringify({
+      mode: 'sequence',
+      nodes: [{ id: 'q1', label: 'q1', desc: '', color: 'blue', x: 0, y: 0, w: 9, h: 4, mirrored: false, life: 10 }],
+      connections: [], regions: []
+    })));
+    await page.click('#btnRefresh');
+    const seqOnly = await page.evaluate(() => ({
+      size: document.getElementById('graphSize').textContent,
+      status: document.getElementById('storageStatus').textContent,
+      label: document.querySelector('[data-i18n="storage.graph"]').textContent
+    }));
+    ok(seqOnly.size !== '0 B' && seqOnly.status === '已保存画布数据。',
+      '只有时序图存档时：占用非 0 且状态为"已保存画布数据": ' + JSON.stringify(seqOnly));
+    ok(seqOnly.label === '画布数据', '占用项的标签涵盖两份存档: ' + seqOnly.label);
+    // 收尾：清掉这份临时存档，恢复后续断言的前提（后续断言按 flow_data 判定）。
+    await page.evaluate(() => localStorage.removeItem('flow_data_seq'));
+    await page.click('#btnRefresh');
 
     // 导入有效节点图 → 紧凑写入。
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-recovery-simple-'));
@@ -336,7 +356,7 @@ async function waitText(page, id, needle, timeout = 10000) {
       regions: [], viewport: { panX: 0, panY: 0, scale: 1 }
     }), 'utf8');
     await (await page.$('#graphFile')).uploadFile(goodFile);
-    await waitText(page, 'ioStatus', '节点图数据已写入');
+    await waitText(page, 'ioStatus', '画布数据已写入');
     const imported = await page.evaluate(() => localStorage.getItem('flow_data'));
     ok(JSON.parse(imported).nodes.length === 2 && JSON.parse(imported).connections.length === 1 && !imported.includes('\n'), '导入节点图成功并以紧凑格式保存');
 
@@ -380,7 +400,7 @@ async function waitText(page, id, needle, timeout = 10000) {
       Storage.prototype.setItem = window.__originalSetItem;
       return unchanged;
     }, beforeQuota);
-    ok(quota && await page.evaluate(() => document.getElementById('ioStatus').textContent.includes('当前节点图数据保持不变')), 'QuotaExceededError 时原节点图保持不变');
+    ok(quota && await page.evaluate(() => document.getElementById('ioStatus').textContent.includes('当前画布数据保持不变')), 'QuotaExceededError 时原画布数据保持不变');
 
     // 恢复默认设置。
     await page.click('#btnResetAll');
@@ -393,7 +413,7 @@ async function waitText(page, id, needle, timeout = 10000) {
     await page2.goto(TOOL_URL, { waitUntil: 'load', timeout: 60000 });
     await page2.evaluate(() => localStorage.setItem('flow_data', JSON.stringify({ nodes: [{ id: 'x', label: 'x', x: 0, y: 0, w: 8.5, h: 4 }], connections: [], regions: [] })));
     await page2.close();
-    await waitText(page, 'pageAlert', '节点图数据被其他页面修改');
+    await waitText(page, 'pageAlert', '画布数据被其他页面修改');
     ok(await page.evaluate(() => document.getElementById('pageAlert').classList.contains('show')), '检测到旧 Weave 页面写回时显示告警');
 
     const keybindPage = await browser.newPage();
@@ -497,7 +517,7 @@ async function waitText(page, id, needle, timeout = 10000) {
     await siteTool.evaluate(() => { const c = document.querySelector('[data-bool="flow_snap_size"]'); c.checked = false; c.dispatchEvent(new Event('change')); });
     await waitText(siteTool, 'settingsStatus', '设置已保存');
     await siteTool.click('#btnClearGraph');
-    await waitText(siteTool, 'graphStatus', '节点图数据已清空');
+    await waitText(siteTool, 'graphStatus', '画布数据已清空');
     const siteCleared = await siteTool.evaluate(() => localStorage.getItem('flow_data'));
     await siteTool.close();
 

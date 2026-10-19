@@ -19,15 +19,19 @@
 
 <h2>Features</h2>
 
-- **Nodes** — add, delete, select (click / box-select / multi-select), drag to move, inline editing, copy & paste, resize via right-click
+- **Canvas modes** — the mode button at the far right of the header switches between the **node graph** and the **sequence diagram**; each mode keeps its own document, and switching saves what you wrote in the previous one
+- **Nodes** — add, delete, select (click / box-select / multi-select mode / Ctrl+click), drag to move, inline editing, copy & paste, resize via right-click (continuous drag, smooth snap to the grid on release)
 - **Connections** — create by dragging sockets, delete, edit labels, custom Bézier curve adjustments
-- **Regions** — draw a region frame (Region key / Alt+drag), move it with its contained nodes, edit name/color or delete via right-click, nodes dragged in are owned automatically
+- **Sequence diagram** — each participant's connection point sits at the bottom center with a lifeline running down from it; drag the end handle to change its length, and drag out a horizontal message arrow onto another participant's lifeline — drag up or down while creating to pick its height; right-click a message to adjust its position or switch its line style (solid / dashed), and right-click a connection point to move it together with every message attached to it; drag a participant so that a message falls outside its lifeline and that message turns into a red dashed warning line first, and is only removed when you release
+- **Regions** — draw a region frame (Region key / Alt+drag), move it with its contained nodes, resize it, edit name/color or delete via right-click, nodes dragged in are owned automatically, regions can be nested
+- **Align height** — a sequence-mode sidebar tool: turn it on, press on the canvas and drag to the target height, then release to pull every node (or only the selected ones) onto that height
 - **Collapse chains** — click the − badge on a node's output socket to collapse the chain after it, + to expand; nesting supported
 - **Linked highlight** — hold Alt and click a node to highlight its directly linked nodes and connections, with a slight blur on everything else
 - **Canvas** — pan (drag / middle button), wheel zoom, fit view, editable coordinate HUD
 - **Colors** — 5 presets + custom color-wheel picker, Ctrl+wheel to cycle quickly
-- **Import / Export** — JSON import/export (with viewport info), PNG export, drag-and-drop JSON import
-- **More** — undo/redo (up to 50 steps), read-only mode, auto-save to localStorage, focus mode (Ctrl+H), language switch (中文 / English) in Settings, customizable keybindings (shown on first launch), alignment settings (node position/size and region position/size snapped to grid, resettable)
+- **Import / Export** — JSON import/export (with viewport info), PNG export (the image embeds the document JSON and can be dragged back in), drag-and-drop JSON/PNG import
+- **More** — undo/redo (up to 50 steps), read-only mode, auto-save to localStorage, focus mode (Ctrl+H), language switch (中文 / English) in Settings, customizable keybindings (shown on first launch), alignment settings (node position/size, region position/size and message height snapped to grid, resettable; the panel shows the set that matches the current canvas mode)
+- **Touch** — one-finger drag on blank canvas to pan, one-finger drag on nodes / sockets / resize handles, two-finger pinch to zoom and pan, tap to select, double-tap to create a node and edit text, long-press for context menus (node / connection / region / blank canvas), a sidebar Box-select mode replacing Shift+drag, and a responsive layout for narrow screens
 
 <hr>
 

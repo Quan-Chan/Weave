@@ -30,7 +30,10 @@ const MODALS = [
   { id: 'settingsModal', open: 'App.showSettings()', close: 'App.closeSettings()' },
   { id: 'modal', open: "App.openNodeModal(App.canvasState.nodes[0].id)", close: 'App.closeModal()' },
   { id: 'regionModal', open: "App.openRegionModal(App.canvasState.regions[0].id)", close: 'App.closeRegionModal()' },
-  { id: 'cpModal', open: 'App.openCustomPicker && App.openCustomPicker()', close: 'App.cancelCustomPicker()' }
+  { id: 'cpModal', open: 'App.openCustomPicker && App.openCustomPicker()', close: 'App.cancelCustomPicker()' },
+  // 本夹具只有两个节点、没有连线，故用「时序线颜色」形态打开同一个弹窗盒子
+  // （连线形态只多一行标签输入，盒子的宽高由同一套 .modal-box 规则决定）。
+  { id: 'connModal', open: "App.openConnProps({ kind: 'life', id: App.canvasState.nodes[0].id })", close: 'App.closeConnModal()' }
 ];
 
 (async () => {

@@ -1,7 +1,7 @@
 'use strict';
 // 实证复现脚本：验证三个疑似 bug 是否在当前代码中真实存在
 // 1) P0-1: 嵌套收起 → 移动根 → 展开外层根，内层偏移读脏数据（错位）
-// 2) P0-2: 导入数据 collapse.hidden 含 null → _restoreFromSerialized 崩溃
+// 2) P0-2: 导入数据 collapse.hidden 含 null → 导入路径（_loadFromData）崩溃
 // 3) blur 误建线: socket 拖拽中 window blur → onUp(FocusEvent) 误建线
 const { launchBrowser, openApp, sleep } = require('./helpers/launch');
 

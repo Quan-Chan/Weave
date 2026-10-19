@@ -38,6 +38,8 @@
 | 压缩发布版修改 | cd test && npm run test:min |
 | 收起功能 | cd test && npm run test:collapse |
 | 导入/持久化/编辑快捷键 | cd test && npm run test:data-safety |
+| 导入/持久化/错误处理（攻击性） | cd test && npm run test:robust |
+| PNG 内嵌存档 / 图片导入 | cd test && npm run test:png |
 | 恢复工具/本地存档救援 | cd test && npm run test:recovery |
 | 触控手势 | cd test && npm run test:touch |
 | 选中逻辑 / 多选模式 | cd test && npm run test:multi |
@@ -47,7 +49,10 @@
 | 关联高亮 | cd test && npm run test:hl |
 | 对齐设置 | cd test && npm run test:snap |
 | 吸附动画 | cd test && npm run test:dragsnap |
+| 高度对齐 | cd test && npm run test:align |
+| 节点尺寸调整 | cd test && npm run test:resize |
 | 撤销历史 | cd test && npm run test:undo |
+| 时序图 | cd test && npm run test:seq |
 | 历史 bug 回归 | cd test && npm run test:repro |
 | 提交前完整回归 | cd test && npm test |
 
@@ -57,6 +62,8 @@ npm scripts 与测试文件的对应关系：
 - test:gui = gui-smoke.js
 - test:collapse = collapse-test.js + collapse-edge-test.js
 - test:data-safety = data-safety-gui-test.js
+- test:robust = robustness-gui-test.js
+- test:png = png-doc-test.js
 - test:recovery = recovery-tool-test.js
 - test:touch = touch-smoke-test.js
 - test:multi = multi-select-test.js
@@ -66,13 +73,16 @@ npm scripts 与测试文件的对应关系：
 - test:hl = hl-smoke.js + hl-keybind-test.js + hl-keybind-ui-test.js
 - test:snap = snap-reset-test.js
 - test:dragsnap = node-drag-snap-test.js
+- test:align = align-nodes-test.js
+- test:resize = node-resize-test.js
 - test:undo = undo-cap-test.js
+- test:seq = seq-gui-test.js
 - test:repro = repro-bugs.js
-- test:fast = check-version.js + check-tests.js + check-module-list.js + geom-unit-test.js + i18n-keys.js + check-structure.js
+- test:fast = check-version.js + check-tests.js + check-module-list.js + geom-unit-test.js + i18n-keys.js + i18n-recovery.js + check-structure.js
 - test:tests = check-tests.js
 - test:modules = check-module-list.js
 - test:version = check-version.js
-- test:i18n = i18n-keys.js
+- test:i18n = i18n-keys.js + i18n-recovery.js
 - test:min = build-min.js --check + min-smoke.js
 
 单独运行单个测试文件：在仓库根目录执行 node test/文件名.js。测试台架与测试清单见 ../test/README.md。

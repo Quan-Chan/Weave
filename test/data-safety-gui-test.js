@@ -276,7 +276,7 @@ async function runImportTests(page) {
   ok(repair.inputUnchanged, '字段修复不得污染调用者输入');
   ok(repair.regionsIsArray && repair.regionCount === 0, '缺省 regions 按空数组处理');
   ok(repair.node && repair.node.x === -300 && repair.node.y === -60 &&
-    repair.node.w === 170 && repair.node.h === 60 && repair.node.labelType === 'string' && !repair.node.hasCollapse,
+    repair.node.w === 180 && repair.node.h === 60 && repair.node.labelType === 'string' && !repair.node.hasCollapse,
     '非法节点字段按当前默认/最小尺寸规则修复: ' + detail(repair.node));
   ok(repair.node && repair.node.desc === '' && repair.node.color === 'blue' && repair.node.mirrored === false,
     'desc/color/mirrored 非法值修复为当前默认模型: ' + detail(repair.node));

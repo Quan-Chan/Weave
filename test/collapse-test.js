@@ -267,8 +267,17 @@ const shot = async (page, name) => {
   const dl = await page.evaluate('window.__dl');
   console.log('export:', dl ? dl.name : '(none)');
   if (!dl || !dl.name.endsWith('.png')) fail('需求5: PNG 下载未触发');
-  const b64 = dl.href.split(',')[1];
-  const pngBuf = Buffer.from(b64, 'base64');
+  //下载目标可能是 data URL（无内嵌数据的旧路径）或 blob URL（内嵌存档
+  //路径）：两种都在页内取回字节并转成 base64，供落盘与像素比对复用。
+  const hrefToB64 = href => page.evaluate(async (h) => {
+    if (h.indexOf('data:') === 0) return h.split(',')[1];
+    const buf = new Uint8Array(await (await fetch(h)).arrayBuffer());
+    let s = '';
+    for (let i = 0; i < buf.length; i++) s += String.fromCharCode(buf[i]);
+    return btoa(s);
+  }, href);
+  const pngB64 = await hrefToB64(dl.href);
+  const pngBuf = Buffer.from(pngB64, 'base64');
   const pngPath = path.join(SHOTS, 'export_collapsed.png');
   fs.writeFileSync(pngPath, pngBuf);
   console.log('PNG saved -> ' + pngPath + ' (' + pngBuf.length + ' bytes)');
@@ -316,7 +325,7 @@ const shot = async (page, name) => {
     return { badge: colorCount('x_B'), plain: colorCount('x_E'), w: img.width, h: img.height };
   }, b64, includeConnControls);
 
-  const exportPx = await sampleSockets(b64, true);
+  const exportPx = await sampleSockets(pngB64, true);
   console.log('export pixels:', JSON.stringify(exportPx));
   if (!(exportPx.plain > 30)) fail('需求5d: 常规连接点中心应为实心圆点: ' + JSON.stringify(exportPx));
   if (!(exportPx.badge < exportPx.plain)) fail('需求5d: 导出 PNG 中徽标连接点中心不应为实心圆点: ' + JSON.stringify(exportPx));
@@ -325,7 +334,8 @@ const shot = async (page, name) => {
   await page.evaluate(() => { window.__dl = null; });
   await page.evaluate(() => { App._exportPNGLegacy(); });
   await sleep(500);
-  const legacyB64 = await page.evaluate(() => (window.__dl && String(window.__dl.href).indexOf('data:image/png') === 0) ? window.__dl.href.split(',')[1] : null);
+  const legacyHref = await page.evaluate(() => window.__dl && window.__dl.href);
+  const legacyB64 = legacyHref ? await hrefToB64(legacyHref) : null;
   if (!legacyB64) fail('需求5e: 旧版导出未触发下载');
   const legacyPx = await sampleSockets(legacyB64, false);
   console.log('legacy export pixels:', JSON.stringify(legacyPx));

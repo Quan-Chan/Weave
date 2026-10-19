@@ -132,6 +132,52 @@ const shot = async (page, name) => {
   if (c2 !== 2) throw new Error('期望 2 条连线，实际 ' + c2);
   await shot(page, '06_parallel');
 
+  /* 连线取色规则：节点图默认「跟随节点色」（设置项默认开）。关掉之后连线改用
+     自己选到的颜色，未选过则是缺省蓝（预设蓝）。时序图那份默认相反，
+     见 test/seq-gui-test.js。 */
+  const followOn = await page.evaluate(() => ({
+    field: App._connFollowGraph,
+    box: document.getElementById('setConnFollowGraph').checked
+  }));
+  if (!followOn.field || !followOn.box) {
+    throw new Error('节点图默认应开启「连线颜色跟随节点色」: ' + JSON.stringify(followOn));
+  }
+  // 把源节点改成黄色：跟随状态下连线应随之变黄。
+  await page.evaluate(() => {
+    App.canvasState.nodes[0].color = 'yellow';
+    App.renderCanvas({ center: false });
+    App.renderLines();
+  });
+  await sleep(250);
+  const followed = await page.evaluate(() => getComputedStyle(document.querySelector('#linesSvg .line')).stroke);
+  if (followed !== 'rgb(234, 179, 8)') {
+    throw new Error('跟随节点色时连线应取源节点色，实际 ' + followed);
+  }
+  console.log('节点图连线随源节点变色:', followed);
+  // 关掉跟随：连线不再随节点走，回到缺省蓝。
+  await page.evaluate(() => {
+    const box = document.getElementById('setConnFollowGraph');
+    box.checked = false;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await sleep(250);
+  const unfollowed = await page.evaluate(() => {
+    const line = document.querySelector('#linesSvg .line');
+    return { stroke: getComputedStyle(line).stroke, cls: line.getAttribute('class'), stored: App._settings.getBool('connFollowGraph') };
+  });
+  if (unfollowed.stroke !== 'rgb(59, 130, 246)' || unfollowed.cls.indexOf('s-blue') < 0 || unfollowed.stored !== false) {
+    throw new Error('关掉跟随后连线应为缺省蓝: ' + JSON.stringify(unfollowed));
+  }
+  console.log('关掉跟随后连线用缺省蓝:', unfollowed.stroke);
+  // 复原（后续用例按默认状态运行）。
+  await page.evaluate(() => {
+    App.canvasState.nodes[0].color = 'blue';
+    const box = document.getElementById('setConnFollowGraph');
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await sleep(250);
+
   // ── 5) 右键 → 调整节点大小（虚线框）──
   await page.mouse.click(node0.x, node0.y, { button: 'right' });
   await sleep(200);
@@ -179,7 +225,7 @@ const shot = async (page, name) => {
   const enState = await page.evaluate(`({
     addBtn: document.getElementById('btnAddNode').textContent,
     setTitle: document.querySelector('#settingsModal h3').textContent,
-    badge: document.getElementById('statusBadge').textContent,
+    modeLabel: document.getElementById('modeLabel').textContent,
     helpKey: document.querySelector('#settingsModal .key-value').textContent,
     helpDesc: document.querySelector('#settingsModal .key-desc').textContent,
     lang: App._lang
@@ -358,7 +404,22 @@ const shot = async (page, name) => {
   if (restored.headerHidden) throw new Error('再次 Ctrl+H 未恢复 header');
   await shot(page, '11_chrome_restored');
 
-  // ── 8) 最终断言 ──
+  // ── 8) 侧边栏图标：统一 currentColor + 24×24，形状数不至于变成微缩画 ──
+  const icons = await page.evaluate(`[...document.querySelectorAll('.sidebar-btn svg')].map(s => ({
+    id: s.parentElement.id,
+    vb: s.getAttribute('viewBox'),
+    stroke: s.getAttribute('stroke'),
+    fill: s.getAttribute('fill'),
+    shapes: s.children.length
+  }))`);
+  console.log('侧边栏图标:', JSON.stringify(icons));
+  const badIcon = icons.find(i => i.vb !== '0 0 24 24' || i.stroke !== 'currentColor' ||
+    i.fill !== 'none' || i.shapes > 4);
+  if (icons.length < 6 || badIcon) {
+    throw new Error('侧边栏图标规格不一致（应为 24×24 / currentColor / 至多 4 个形状）: ' + JSON.stringify(badIcon || icons.length));
+  }
+
+  // ── 9) 最终断言 ──
   const summary = await page.evaluate(`({
     nodes: App.canvasState.nodes.length,
     conns: App.canvasState.connections.length,

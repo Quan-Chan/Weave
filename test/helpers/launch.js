@@ -18,25 +18,56 @@ const APP_URL = process.env.WEAVE_APP_URL || 'file:///' + ROOT.replace(/\\/g, '/
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// 尝试 puppeteer.launch;失败(如沙箱 EPERM)回退手动 spawn+connect
+//尽力删除浏览器临时 Profile 目录：Windows 下 Edge 进程退出后文件句柄
+//可能延迟释放（如 first_party_sets.db 被锁），rmSync 报 EBUSY。多轮重试、
+//最终删不掉就放弃——残留一个 temp 目录无害，但清理报错绝不能冒泡成
+//未处理的 Promise 拒绝（那会直接杀掉整个测试进程）。
+async function removeProfile(dir) {
+  for (let i = 0; i < 20; i++) {
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 }); } catch (_) {}
+    if (!fs.existsSync(dir)) return;
+    await sleep(250);
+  }
+}
+
+// 尝试 puppeteer.launch;失败(如沙箱 EPERM)回退手动 spawn+connect。
+// 两条路径都自管 userDataDir：puppeteer 用自己建的临时 Profile 时会在
+// close 后异步删除它，Windows 上偶发 EBUSY 且以未处理拒绝的形式崩掉
+// 进程——传入我们自己 mkdtemp 的目录后它不再自动清理，删除由
+// removeProfile 兜底。
 async function launchBrowser(headed) {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-pup-'));
   try {
     const browser = await puppeteer.launch({
       executablePath: EDGE,
       headless: !headed,
+      userDataDir,
+      protocolTimeout: 90000,
       args: ['--no-first-run', '--disable-gpu', '--window-size=1280,800'],
       defaultViewport: { width: 1280, height: 800 }
     });
-    return { browser, mode: 'launch', cleanup: () => browser.close() };
+    let cleaned = false;
+    return {
+      browser, mode: 'launch',
+      cleanup: async () => {
+        if (cleaned) return;
+        cleaned = true;
+        try { await browser.close(); }
+        finally { await removeProfile(userDataDir); }
+      }
+    };
   } catch (e) {
+    // launch 失败时先收掉这次自建的目录，再走回退路径
+    //（回退路径的目录独立重建，命名 spawnDir 以免遮蔽外层绑定）。
+    await removeProfile(userDataDir);
     // 回退:手动 spawn Edge + DevToolsActivePort 轮询 + connect(stdio ignore 兼容沙箱)
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-pup-'));
+    const spawnDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-pup-'));
     const edgeProc = spawn(EDGE, [
       '--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--window-size=1280,800',
-      '--remote-debugging-port=0', '--user-data-dir=' + userDataDir, 'about:blank'
+      '--remote-debugging-port=0', '--user-data-dir=' + spawnDir, 'about:blank'
     ], { stdio: ['ignore', 'ignore', 'ignore'] });
     edgeProc.on('error', err => console.log('edge spawn error: ' + err.message));
-    const portFile = path.join(userDataDir, 'DevToolsActivePort');
+    const portFile = path.join(spawnDir, 'DevToolsActivePort');
     const deadline = Date.now() + 25000;
     let wsUrl = null;
     while (Date.now() < deadline && !wsUrl) {
@@ -46,17 +77,10 @@ async function launchBrowser(headed) {
       }
       if (!wsUrl) await sleep(200);
     }
-    const removeProfile = async () => {
-      for (let i = 0; i < 20; i++) {
-        try { fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 }); } catch (_) {}
-        if (!fs.existsSync(userDataDir)) return;
-        await sleep(250);
-      }
-    };
     const stopEdge = async () => {
       try { edgeProc.kill(); } catch (_) {}
       for (let i = 0; i < 20 && edgeProc.exitCode === null && edgeProc.signalCode === null; i++) await sleep(100);
-      await removeProfile();
+      await removeProfile(spawnDir);
     };
     if (!wsUrl) {
       await stopEdge();
@@ -88,8 +112,19 @@ async function launchBrowser(headed) {
 // 打开应用页 + 等待就绪 + 关闭首启弹窗。返回 { page, cdp }
 // dismissFirstRun: 是否按 Escape 关掉首次启动弹窗。默认 true；被测对象是首启
 //   弹窗本身时传 false（gui-smoke 第 0 步）。
+// newPage 有一次重试：整机高负载（游戏/杀软扫描临时目录）下 headless 浏览器
+// 偶发对 Target.createTarget / Network.enable 拖死——等 3s 再试一次能救回
+// 大多数瞬时卡死；真死掉的浏览器仍会让调用方看到原始错误。
 async function openApp(browser, { clearStorage = false, dismissFirstRun = true } = {}) {
-  const page = await browser.newPage();
+  let page = null;
+  for (let attempt = 0; attempt < 2 && !page; attempt++) {
+    if (attempt) { await sleep(3000); console.log('  ⚠ newPage 失败，重试一次'); }
+    try {
+      page = await browser.newPage();
+    } catch (e) {
+      if (attempt) throw e;
+    }
+  }
   if (clearStorage) {
     await page.evaluateOnNewDocument(() => { try { localStorage.clear(); } catch (e) {} });
   }

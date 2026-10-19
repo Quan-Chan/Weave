@@ -218,23 +218,53 @@
             "dy": 0
           },
           {
-            "id": "doc3_p5",
+            "id": "doc3_p4b",
             "dx": 75,
             "dy": 0
           },
           {
-            "id": "doc3_p6",
+            "id": "doc3_p5",
             "dx": 90,
             "dy": 0
           },
           {
-            "id": "doc3_p7",
+            "id": "doc3_p6",
             "dx": 105,
             "dy": 0
           },
           {
-            "id": "doc3_p8",
+            "id": "doc3_p7",
             "dx": 120,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p8",
+            "dx": 135,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p9",
+            "dx": 150,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p9c",
+            "dx": 165,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p9d",
+            "dx": 180,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p9b",
+            "dx": 195,
+            "dy": 0
+          },
+          {
+            "id": "doc3_p10",
+            "dx": 210,
             "dy": 0
           }
         ]
@@ -286,19 +316,8 @@
     },
     {
       "id": "doc3_p5",
-      "label": "渲染结构",
-      "desc": "网格 canvas 在屏幕像素空间; canvas-world 平移层含分区与连线 SVG; canvas-nodes 缩放层嵌于其内; 框选与分区预览为屏幕坐标浮层。",
-      "x": 100,
-      "y": 9,
-      "w": 10,
-      "h": 6,
-      "mirrored": false,
-      "color": "cyan"
-    },
-    {
-      "id": "doc3_p6",
-      "label": "模块划分",
-      "desc": "<script> 13 模块拼接 (M01 常量与工具 → M13 装配与启动), check-structure.js 守护。",
+      "label": "界面适配",
+      "desc": "响应式断点按可用空间取(宽度 + 高度 + 横屏); 四个弹窗遮罩 z-index 显式声明, 安全区避让排在断点之前。守护见 test/mobile-layout-test.js。",
       "x": 115,
       "y": 9,
       "w": 10,
@@ -307,9 +326,9 @@
       "color": "cyan"
     },
     {
-      "id": "doc3_p7",
-      "label": "代码规则",
-      "desc": "App 方法简写 + Object.assign 分块; 纯函数入 Weave.*; 内部成员下划线前缀; 箭头方向取自两端节点的 mirrored。",
+      "id": "doc3_p6",
+      "label": "渲染结构",
+      "desc": "网格 canvas 在屏幕像素空间; canvas-world 平移层含分区与连线 SVG; canvas-nodes 缩放层嵌于其内; 框选与分区预览为屏幕坐标浮层。",
       "x": 130,
       "y": 9,
       "w": 10,
@@ -318,10 +337,87 @@
       "color": "cyan"
     },
     {
+      "id": "doc3_p7",
+      "label": "模块划分",
+      "desc": "<script> 13 模块拼接 (M01 常量与工具 → M13 装配与启动), check-structure.js 守护。",
+      "x": 145,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
       "id": "doc3_p8",
+      "label": "代码规则",
+      "desc": "App 方法简写 + Object.assign 分块; 纯函数入 Weave.*; 内部成员下划线前缀; 箭头方向取自两端节点的 mirrored。",
+      "x": 160,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p9",
+      "label": "输入手势",
+      "desc": "鼠标与触控手势并存, 触控层实现于 Pointer Events 且 mouse 指针放行; 触控不另写拖拽实现, 经 _bindDragListeners 与 _touchFire 转换。",
+      "x": 175,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p10",
       "label": "结构守护",
       "desc": "check-structure.js 校验语法、banner 顺序、DOM id、常量区/尾部区、App 与 Weave.* 条目。方法体修改后用 --snapshot 重生成 golden.json 基线。",
-      "x": 145,
+      "x": 235,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p4b",
+      "label": "画布模式与双文档",
+      "desc": "App._mode = graph | sequence，两个模式各持一份独立文档，切换即换 canvasState 指针；存档分 flow_data 与 flow_data_seq，模式记在 flow_mode。时序图：连接点在底边中点，时序线末端把手改长度，消息是水平单向箭头。",
+      "x": 100,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p9b",
+      "label": "高度对齐工具",
+      "desc": "侧边栏开关：按住 500ms 或移动超过 10px 才开始一次对齐（参考线出现即开始），松手把全部节点（已选中时只拉选中的）的左上角纵向判定点落到参考线上；参考线画在格子划分线上，节点因此落进它下方那一格。不满足这两个条件就松手 = 常规空白单击（取消选中，不对齐）。仅时序图模式提供，Escape 退出。时序图下落定后会整理不变量（_repairSeqMessages）。守护见 test/align-nodes-test.js。",
+      "x": 220,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p9c",
+      "label": "消息调整与线型",
+      "desc": "时序图消息只在源端画连接点（目标端由箭头指示，公留母去）；右键「调整位置」拖动改高度、连接点右键拖动带动其上所有消息、多选多根时整组一起平移；连线可切实线/虚线。颜色：右键连线选「属性」（标签 + 颜色），右键时序线选「时序线颜色」，弹窗里是与节点属性同一套颜色行（预设色 + 自定义色轮 + 自定义色仓）外加「默认」按钮。设置项「连线颜色跟随节点色」两个模式各一份：开启取源节点色，关闭用属性里选的颜色（未选过则为预设蓝），节点图默认开、时序图默认关。消息高度是绝对时间坐标：时序线承载不下时（消息跑到节点底边之上，或越过线尾）按设置「消息跟随节点」决定：关闭（默认）两个方向都移除、且节点移动不会把时序线拉长；开启则挪回线上并延长时序线。守护见 test/seq-gui-test.js。",
+      "x": 190,
+      "y": 9,
+      "w": 10,
+      "h": 6,
+      "mirrored": false,
+      "color": "cyan"
+    },
+    {
+      "id": "doc3_p9d",
+      "label": "设置界面（两套）",
+      "desc": "常规页顶部一行标题写明当前是哪一套（节点图设置 / 时序图设置），并按当前画布模式只显示相关项：节点图 5 项（节点位置/大小、分区位置/大小、连线颜色跟随节点色）、时序图 6 项（节点位置/大小、连线对齐网格、消息跟随节点、连线颜色跟随节点色、时序线尾端固定）；语言等全局项两者都有。隔离只在界面层，值共用一份；开弹窗与切模式都会刷新（_applySettingsModeFilter）。",
+      "x": 205,
       "y": 9,
       "w": 10,
       "h": 6,
@@ -443,30 +539,72 @@
       "mirrored": false
     },
     {
-      "id": "c_g_17",
+      "id": "c_g_16b",
       "from": "doc3_p4",
+      "to": "doc3_p4b",
+      "label": "画布模式与双文档",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_16c",
+      "from": "doc3_p4b",
       "to": "doc3_p5",
-      "label": "渲染结构",
+      "label": "界面适配",
       "mirrored": false
     },
     {
       "id": "c_g_18",
       "from": "doc3_p5",
       "to": "doc3_p6",
-      "label": "模块划分",
+      "label": "渲染结构",
       "mirrored": false
     },
     {
       "id": "c_g_19",
       "from": "doc3_p6",
       "to": "doc3_p7",
-      "label": "代码规则",
+      "label": "模块划分",
       "mirrored": false
     },
     {
       "id": "c_g_20",
       "from": "doc3_p7",
       "to": "doc3_p8",
+      "label": "代码规则",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_21",
+      "from": "doc3_p8",
+      "to": "doc3_p9",
+      "label": "输入手势",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_22b",
+      "from": "doc3_p9",
+      "to": "doc3_p9c",
+      "label": "消息调整与线型",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_22d",
+      "from": "doc3_p9c",
+      "to": "doc3_p9d",
+      "label": "设置界面（两套）",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_22e",
+      "from": "doc3_p9d",
+      "to": "doc3_p9b",
+      "label": "高度对齐工具",
+      "mirrored": false
+    },
+    {
+      "id": "c_g_22c",
+      "from": "doc3_p9b",
+      "to": "doc3_p10",
       "label": "结构守护",
       "mirrored": false
     }

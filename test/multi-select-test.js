@@ -198,7 +198,7 @@ const ok = tally.ok;
   ok('I18N 中不再有 ctx.selMulti 词条', !ctxGone.i18n, ctxGone);
   await reset(); await layout();
   await mouseClick((await center('A')).x, (await center('A')).y);
-  await page.evaluate(() => App.showCtx(200, 200, 'A', null, 'title', null));
+  await page.evaluate(() => App.showCtx(200, 200, { nodeId: 'A' }));
   await sleep(200);
   const nodeMenu = await page.evaluate(() => {
     const vis = id => { const e = document.getElementById(id); return !!e && e.style.display !== 'none'; };
