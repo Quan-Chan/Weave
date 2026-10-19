@@ -376,6 +376,39 @@ const shot = async (page, name) => {
   console.log('遮罩点击关闭: 3 个弹窗关闭、节点详情保持');
   await shot(page, '09e_overlay_dismiss');
 
+  // ── 6e) 连线属性弹窗与节点详情弹窗共用同一套字段排版 ──
+  // 连线属性弹窗曾漏接共享表单样式，标签按正文显示、输入框退回浏览器缺省外观。
+  // 比对计算样式：两窗的标签与输入框在非聚焦态必须逐项相同。
+  // 弹窗打开后会自动聚焦首个输入框，先失焦并等过渡（border/bg 有 .15s）结束再读数。
+  const blurField = '(function(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); })()';
+  const fieldStyle = (labelSel, inputSel) => `(function(){
+    const cs = (el) => { const s = getComputedStyle(el);
+      return [s.fontSize, s.color, s.backgroundColor, s.borderTopWidth, s.borderTopColor,
+        s.borderTopLeftRadius, s.padding, s.marginBottom, s.textTransform, s.letterSpacing].join('|'); };
+    return { label: cs(document.querySelector('${labelSel}')), input: cs(document.querySelector('${inputSel}')) };
+  })()`;
+  await page.evaluate('App.openNodeModal(App.canvasState.nodes[0].id)');
+  await sleep(250);
+  await page.evaluate(blurField);
+  await sleep(300);
+  const nodeFields = await page.evaluate(fieldStyle('#modalBox label', '#mLabel'));
+  await page.evaluate('App.closeModal()');
+  await sleep(150);
+  await page.evaluate('App.openConnProps({ kind: "conn", id: App.canvasState.connections[0].id })');
+  await sleep(250);
+  await page.evaluate(blurField);
+  await sleep(300);
+  const connFields = await page.evaluate(fieldStyle('#cmLabelWrap label', '#cmLabel'));
+  await page.evaluate('App.closeConnModal()');
+  await sleep(150);
+  console.log('连线属性字段样式:', JSON.stringify(connFields));
+  if (nodeFields.label !== connFields.label) {
+    throw new Error('连线属性弹窗标签样式未复用节点详情: ' + nodeFields.label + ' vs ' + connFields.label);
+  }
+  if (nodeFields.input !== connFields.input) {
+    throw new Error('连线属性弹窗输入框样式未复用节点详情: ' + nodeFields.input + ' vs ' + connFields.input);
+  }
+
   // ── 7) Ctrl+H 隐藏顶层 UI ──
   const canvasSizeBefore = await page.evaluate(`document.getElementById('canvasStage').clientWidth`);
   await page.keyboard.down('Control');

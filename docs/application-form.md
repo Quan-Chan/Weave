@@ -152,7 +152,9 @@ APPs/Weave.html 的浏览器兼容性说明见 ../UnsupportedBrowsers/README.md�
 | 时序线 | 右键时序线 →「时序线颜色」 | `node.lifeColor` | 节点色 |
 | 节点本体 | 右键节点 →「属性」（既有弹窗） | `node.color` | ——（必填，始终有值） |
 
-弹窗里的颜色行与节点/分区属性弹窗是同一套（预设色 + 自定义色轮 + 自定义色仓），另加一个「默认」按钮：清掉自己设过的颜色、回到缺省来源（否则一旦设过就回不去了）。弹窗底部一行说明当前缺省色从哪来。
+弹窗里的颜色行与节点/分区属性弹窗是同一套（预设色 + 自定义色轮 + 自定义色仓）。
+
+标签与输入框的排版也共用一份：节点详情、分区属性、连线属性三个弹窗的 `.modal-box` 带 `.modal-form` 类，字段字号、底色、边框与聚焦光晕由该类统一给出。设置弹窗与色轮弹窗的控件尺寸不同，不套用该类。
 
 设置项「连线颜色跟随节点色」**两个模式各存一份**（键 `flow_conn_follow_graph` / `flow_conn_follow_seq`），因为两者默认值相反：节点图默认开启（连线随节点颜色，沿用既有观感），时序图默认关闭（消息用自己选到的颜色，未选过则是预设蓝）。字段只在设过值时序列化；导入时非预设色且非 `#rrggbb` 的值一律剔除。
 
@@ -178,7 +180,7 @@ viewport 声明 `viewport-fit=cover`，配合 `env(safe-area-inset-*)` 让顶栏
 
 安全区避让是无条件规则，放在 CSS 1 末尾、全部断点之前。`.header` 用 `padding-inline`、`.sidebar` 用 `padding-inline` 与 `padding-block` 写出：断点用 `padding` 简写覆盖内边距，两者同特异性，源序在后的一方获胜，无条件规则排在断点之后会让断点声明的内边距失效。
 
-四个弹窗遮罩的 `z-index` 一律显式写出（`#modal` 300、`#cpModal` 400、`#settingsModal` 350、`#regionModal` 360）。缺省为 `auto` 时遮罩会排在顶栏（`z-index:100`）之下，顶栏覆盖的一条区域内点遮罩不关闭、也点不到弹窗顶部内容。
+五个弹窗遮罩的 `z-index` 一律显式写出（`#modal` 300、`#cpModal` 400、`#settingsModal` 350、`#regionModal` 360、`#connModal` 365）。缺省为 `auto` 时遮罩会排在顶栏（`z-index:100`）之下，顶栏覆盖的一条区域内点遮罩不关闭、也点不到弹窗顶部内容。
 
 守护见 test/mobile-layout-test.js。
 

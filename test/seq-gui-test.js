@@ -1176,9 +1176,7 @@ async function dragMouse(page, from, to, steps = 8) {
           title: document.getElementById('cmTitle').textContent,
           labelShown: getComputedStyle(document.getElementById('cmLabelWrap')).display !== 'none',
           dots: document.querySelectorAll('#cmColors button').length,
-          wheel: document.querySelectorAll('#cmColors [data-c="__wheel__"]').length,
-          defActive: !!document.querySelector('#cmColors .cm-default-btn.active'),
-          hint: document.getElementById('cmHint').textContent
+          wheel: document.querySelectorAll('#cmColors [data-c="__wheel__"]').length
         };
       });
       const ctxMenu = () => page.evaluate(() => ({
@@ -1254,21 +1252,7 @@ async function dragMouse(page, from, to, steps = 8) {
       await pick('orange');
       await save();
       const afterConn = await snap();
-      // (2) 再进属性点"默认" → 清掉自己设的颜色，回到派生色。
-      await rightClick(300, 200);
-      await page.evaluate(() => document.getElementById('ctxProps').click());
-      await sleep(250);
-      const defModal = await modal();
-      await pick('__default__');
-      await save();
-      const afterDefault = await snap();
-      // 再设回橙色，供后面的存档往返使用。
-      await rightClick(300, 200);
-      await page.evaluate(() => document.getElementById('ctxProps').click());
-      await sleep(250);
-      await pick('orange');
-      await save();
-      // (3) 右键时序线 → 时序线颜色 → 弹窗改色。
+      // (2) 右键时序线 → 时序线颜色 → 弹窗改色。
       await rightClick(90, 300);
       const lifeMenu = await ctxMenu();
       await page.evaluate(() => document.getElementById('ctxLifeColor').click());
@@ -1277,7 +1261,7 @@ async function dragMouse(page, from, to, steps = 8) {
       await pick('green');
       await save();
       const afterLife = await snap();
-      // (4) 改节点色 → 它的连接点、时序线一并跟随。
+      // (3) 改节点色 → 它的连接点、时序线一并跟随。
       await page.evaluate(() => {
         const n = App._getNodeById('s1');
         n.color = 'yellow';
@@ -1290,7 +1274,6 @@ async function dragMouse(page, from, to, steps = 8) {
         want: want, norm: norm,
         swDefault: swDefault, offFollow: offFollow, notFollowing: notFollowing, didFollow: didFollow,
         connMenu: connMenu, connModal: connModal, afterConn: afterConn,
-        defModal: defModal, afterDefault: afterDefault,
         lifeMenu: lifeMenu, lifeModal: lifeModal, afterLife: afterLife, afterNode: afterNode
       };
     })();
@@ -1308,22 +1291,18 @@ async function dragMouse(page, from, to, steps = 8) {
       colors.didFollow.rule === 'participant', colors.didFollow);
     t.ok('右键连线给出「属性」入口',
       colors.connMenu.props !== 'none', colors.connMenu);
-    t.ok('连线的「属性」打开色彩属性弹窗（有标签行、预设色与自定义色轮、默认按钮）',
+    t.ok('连线的「属性」打开色彩属性弹窗（有标签行、预设色与自定义色轮）',
       colors.connModal.open && colors.connModal.title === '连线属性' && colors.connModal.labelShown &&
-      colors.connModal.dots >= 7 && colors.connModal.wheel === 1 && colors.connModal.defActive === true,
+      colors.connModal.dots >= 6 && colors.connModal.wheel === 1,
       colors.connModal);
-    t.ok('弹窗里说明缺省颜色从哪来（时序图默认不跟随 → 缺省蓝）',
-      colors.connModal.hint.indexOf('缺省蓝') >= 0, colors.connModal.hint);
     t.ok('在属性弹窗里选色并保存后，连线变色',
       colors.afterConn.connColor === 'orange' && N(colors.afterConn.lineStroke) === N(W.orange), colors.afterConn);
-    t.ok('点「默认」后清掉自己设的颜色，连线回到缺省来源（时序图默认不跟随 → 预设蓝）',
-      colors.afterDefault.connColor === null && N(colors.afterDefault.lineStroke) === N(W.blue), colors.afterDefault);
     t.ok('右键时序线给出「时序线颜色」，且没有节点级动作',
       colors.lifeMenu.lifeColor !== 'none' && colors.lifeMenu.edit === 'none' && colors.lifeMenu.del === 'none',
       colors.lifeMenu);
     t.ok('时序线弹窗只有颜色（标签行隐藏）',
-      colors.lifeModal.open && colors.lifeModal.title === '时序线颜色' && !colors.lifeModal.labelShown &&
-      colors.lifeModal.defActive === true, colors.lifeModal);
+      colors.lifeModal.open && colors.lifeModal.title === '时序线颜色' && !colors.lifeModal.labelShown,
+      colors.lifeModal);
     t.ok('改时序线颜色后：这条时序线变色，它上面的源端连接点跟着变（目标端没有连接点）',
       colors.afterLife.lifeColor === 'green' && N(colors.afterLife.life0) === N(W.green) &&
       colors.afterLife.pins[90] === W.greenHex && colors.afterLife.pins[690] === undefined, colors.afterLife);

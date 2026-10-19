@@ -411,10 +411,14 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
 .modal-box button.p{background:var(--accent);color:#fff;border-color:var(--accent)}
 .modal-box button.p:hover{background:var(--accent-hover)}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end}
-#modalBox label,#regionModalBox label{display:block;font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
-#modalBox input,#modalBox textarea,#regionModalBox input,#regionModalBox textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-size:12px;margin-bottom:10px;font-family:inherit;outline:none;transition:.15s}
-#modalBox input:focus,#modalBox textarea:focus,#regionModalBox input:focus,#regionModalBox textarea:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-light)}
-#modalBox textarea,#regionModalBox textarea{min-height:40px;resize:vertical}
+/*简洁表单弹窗（节点详情 / 分区属性 / 连线属性）的表单排版：标签小字距，
+   输入框统一底色与聚焦光晕。这三个弹窗的字段结构相同，样式按类共用，
+   新建同类弹窗时给 .modal-box 加 .modal-form 即可，无需再改选择器。
+   设置弹窗与色轮弹窗不用该类，它们有各自的控件尺寸。*/
+.modal-box.modal-form label{display:block;font-size:10px;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
+.modal-box.modal-form input,.modal-box.modal-form textarea{width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text-primary);font-size:12px;margin-bottom:10px;font-family:inherit;outline:none;transition:.15s}
+.modal-box.modal-form input:focus,.modal-box.modal-form textarea:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-light)}
+.modal-box.modal-form textarea{min-height:40px;resize:vertical}
 
 .layout{display:flex;flex-direction:column;height:100vh}
 /*专注模式（Ctrl+H）：隐藏顶部工具栏与右侧边栏，使画布填满窗口。Flex 布局自动重新排布。*/
@@ -485,13 +489,6 @@ socket 反复缩小→放大的抽搐根源）。重插前给悬停中的 socket
 .modal-box .m-wheel-btn::before{content:'';position:absolute;inset:-2px;border-radius:50%;background:conic-gradient(from 0deg,hsl(0,70%,75%),hsl(90,70%,75%),hsl(180,70%,75%),hsl(270,70%,75%),hsl(360,70%,75%))}
 .modal-box .m-wheel-btn::after{content:'';position:absolute;inset:2px;border-radius:50%;background:#fff}
 .modal-box .m-wheel-btn svg{position:absolute;inset:0;margin:auto;width:12px;height:12px;color:var(--text-muted)}
-/*连线 / 时序线色彩属性弹窗里的一行说明：讲清缺省颜色从哪来。*/
-.cm-hint{font-size:12px;color:var(--text-muted);line-height:1.5;margin:0 0 10px}
-/*色彩属性弹窗里的"默认"按钮：清掉自己设过的颜色，回到派生色。*/
-.modal-box .cm-default-btn{height:22px;padding:0 9px;border-radius:11px;border:2px solid var(--border);
-  background:#fff;color:var(--text-muted);font-size:11px;line-height:1;cursor:pointer;flex-shrink:0;transition:transform .15s}
-.modal-box .cm-default-btn:hover{transform:scale(1.08)}
-.modal-box .cm-default-btn.active{border-color:var(--accent);color:var(--accent)}
 
 /* ══ CSS 4 · 生成色下拉 ══ */
 /*── 生成节点颜色下拉框 ──*/
@@ -772,7 +769,7 @@ body.touch #ctx{min-width:150px}
 
 <!-- ══ HTML 4 · 模态家族（节点详情 / 自定义颜色 / 关于 / 设置）══ -->
 <div id="modal" class="modal-overlay">
-  <div id="modalBox" class="modal-box">
+  <div id="modalBox" class="modal-box modal-form">
     <h3 id="mTitle" data-i18n="modal.editTitle">编辑节点</h3>
     <label data-i18n="modal.label">标签</label>
     <input id="mLabel" spellcheck="false">
@@ -941,7 +938,7 @@ body.touch #ctx{min-width:150px}
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v2.0</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v2.0.1</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -956,7 +953,7 @@ body.touch #ctx{min-width:150px}
 
 <!-- ══ HTML 5 · 分区属性弹窗（画框分区）══ -->
 <div id="regionModal" class="modal-overlay">
-  <div id="regionModalBox" class="modal-box">
+  <div id="regionModalBox" class="modal-box modal-form">
     <h3 data-i18n="modal.regionTitle">编辑分区</h3>
     <label data-i18n="modal.regionLabel">分区名称</label>
     <input id="rmLabel" spellcheck="false">
@@ -969,10 +966,9 @@ body.touch #ctx{min-width:150px}
   </div>
 </div>
 
-<!-- 连线 / 时序线的色彩属性：连线多一个标签输入（时序线没有标签）。
-     两者的颜色都缺省从节点色派生，因此弹窗里说明当前缺省来源。 -->
+<!-- 连线 / 时序线的色彩属性：连线多一个标签输入（时序线没有标签）。 -->
 <div id="connModal" class="modal-overlay">
-  <div id="connModalBox" class="modal-box">
+  <div id="connModalBox" class="modal-box modal-form">
     <h3 id="cmTitle" data-i18n="modal.connTitle">连线属性</h3>
     <div id="cmLabelWrap">
       <label data-i18n="modal.label">标签</label>
@@ -980,7 +976,6 @@ body.touch #ctx{min-width:150px}
     </div>
     <label data-i18n="modal.color">颜色</label>
     <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;align-items:center" id="cmColors"></div>
-    <div class="cm-hint" id="cmHint"></div>
     <div class="modal-btns">
       <button id="btnCloseConnModal" data-i18n="modal.cancel">取消</button>
       <button class="p" id="btnSaveConnModal" data-i18n="modal.save">保存</button>
@@ -1253,11 +1248,6 @@ const I18N = {
     'modal.regionTitle': '编辑分区', 'modal.regionLabel': '分区名称', 'modal.regionColor': '分区颜色',
     'modal.cancel': '取消', 'modal.save': '保存', 'modal.customColor': '自选颜色', 'modal.confirm': '确认',
     'modal.connTitle': '连线属性', 'modal.lifeColorTitle': '时序线颜色',
-    'modal.colorDefault': '默认',
-    'modal.colorPicked': '已选择颜色，保存后生效',
-    'modal.lifeColorHint': '未单独设色，当前跟随节点颜色',
-    'modal.connColorFollow': '未单独设色，当前跟随源节点颜色（{node}）',
-    'modal.connColorDefault': '未单独设色，当前用缺省蓝色（可在设置里改成跟随节点色）',
     // 关于 / 快速入门
     'about.appName': '软件名称', 'about.version': '版本号',
     'about.projectUrl': '项目地址', 'about.devHome': '开发者主页', 'about.sigmaTip': '千万不要点',
@@ -1382,11 +1372,6 @@ const I18N = {
     'modal.regionTitle': 'Edit region', 'modal.regionLabel': 'Region name', 'modal.regionColor': 'Region color',
     'modal.cancel': 'Cancel', 'modal.save': 'Save', 'modal.customColor': 'Custom color', 'modal.confirm': 'OK',
     'modal.connTitle': 'Connection properties', 'modal.lifeColorTitle': 'Lifeline color',
-    'modal.colorDefault': 'Default',
-    'modal.colorPicked': 'Color selected; it applies when you save',
-    'modal.lifeColorHint': 'No color of its own; currently follows the node color',
-    'modal.connColorFollow': 'No color of its own; currently follows the source node ({node})',
-    'modal.connColorDefault': 'No color of its own; currently uses the preset blue (change it in settings to follow the node color)',
     'about.appName': 'Name', 'about.version': 'Version',
     'about.projectUrl': 'Project', 'about.devHome': 'Developer', 'about.sigmaTip': 'Do NOT click',
     'set.title': 'Settings', 'set.snapNodes': 'Snap nodes',
@@ -9660,8 +9645,7 @@ Object.assign(App, {
      两者各有一个可选颜色字段，缺省都从节点色派生：
        conn.color     —— 连线（消息）自身；是否派生还受设置项「连线颜色
                          跟随节点色」控制（节点图默认关、时序图默认开）；
-       node.lifeColor —— 时序线自身，缺省跟随节点色。
-     "默认"按钮清掉自己设过的颜色，重新回到派生色（否则一旦设过就回不去了）。*/
+       node.lifeColor —— 时序线自身，缺省跟随节点色。*/
   openConnProps(target) {
     if (this.readOnly || !target) return;
     const m = this._getEl('connModal');
@@ -9685,8 +9669,7 @@ Object.assign(App, {
     if (title) title.textContent = this.t(isLife ? 'modal.lifeColorTitle' : 'modal.connTitle');
     const wrap = this._getEl('cmLabelWrap');
     if (wrap) wrap.style.display = isLife ? 'none' : '';
-    this._connModalHint();
-    this._buildConnModalDots(cur, !cur);
+    this._buildConnModalDots(cur);
     m.classList.add('on');
   },
   closeConnModal() {
@@ -9715,56 +9698,19 @@ Object.assign(App, {
     this.renderCanvas({ center: false });
     this.renderLines();
   },
-  //弹窗里的一行说明：讲清当前缺省色从哪来（跟随节点色 / 默认线色 / 节点色）。
-  _connModalHint() {
-    const target = this._connModalTarget;
-    const hint = this._getEl('cmHint');
-    if (!target || !hint) return;
-    if (this._connModalColor) { hint.textContent = this.t('modal.colorPicked'); return; }
-    if (target.kind === 'life') { hint.textContent = this.t('modal.lifeColorHint'); return; }
-    const c = this._getConnById(target.id);
-    const fn = c ? this._getNodeById(c.from) : null;
-    if (this._connFollowsNodeColor()) {
-      hint.textContent = this.t('modal.connColorFollow', { node: fn ? (fn.label || '') : '' });
-    } else {
-      hint.textContent = this.t('modal.connColorDefault');
-    }
-  },
-  _buildConnModalDots(active, useDefault) {
-    const defBtn = '<button class="cm-default-btn' + (useDefault ? ' active' : '') + '" data-c="__default__">' +
-      Weave.Util.escapeHtml(this.t('modal.colorDefault')) + '</button>';
+  _buildConnModalDots(active) {
     this._buildDotPanel('cmColors', 'm', active, (b) => {
-      if (b.dataset.c === '__default__') {
-        this._connModalColor = '';
-        this._buildConnModalDots(this._connDerivedColor(this._connModalTarget), true);
-        this._connModalHint();
-        return;
-      }
       if (b.dataset.c === '__wheel__') {
         const hex = COLORS.includes(active) ? (PRESET_COLORS.find(p => p.id === active) || {}).hex : active;
         this.openCustomPicker(RE_HEX6.test(hex || '') ? hex : '#4090ff', (v) => {
           this._connModalColor = v;
-          this._buildConnModalDots(v, false);
-          this._connModalHint();
+          this._buildConnModalDots(v);
         });
         return;
       }
       this._connModalColor = b.dataset.c;
-      this._buildConnModalDots(b.dataset.c, false);
-      this._connModalHint();
-    }, '<button class="m-wheel-btn" data-c="__wheel__"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>' + defBtn);
-  },
-  //目标当前实际用到的颜色（没有自己设过颜色时的派生结果）。
-  _connDerivedColor(target) {
-    if (!target) return null;
-    if (target.kind === 'life') {
-      const n = this._getNodeById(target.id);
-      return n ? n.color : null;
-    }
-    const c = this._getConnById(target.id);
-    const fn = c ? this._getNodeById(c.from) : null;
-    if (!fn) return null;
-    return this._connFollowsNodeColor() ? fn.color : CONN_DEFAULT_COLOR;
+      this._buildConnModalDots(b.dataset.c);
+    }, '<button class="m-wheel-btn" data-c="__wheel__"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>');
   },
 
   //高亮关联节点：与鼠标端 Alt+单击节点同语义。触控端无修饰键，
