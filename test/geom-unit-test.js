@@ -49,5 +49,61 @@ conns = [{ from: '1', to: '2' }, { from: '2', to: '3' }, { from: '3', to: '4' },
 cl = collapseClosure(conns, '1');
 assert('5层链闭包', cl.length === 4 && cl[3] === '5');
 
+// ── 时序消息避让分组 seqMsgOffsetGroups ──
+const groupsBody = extractMethod(html, 'seqMsgOffsetGroups');
+const seqMsgOffsetGroups = new Function('items', groupsBody);
+const gidx = items => { const m = seqMsgOffsetGroups(items); return items.map(it => m.get(it.id)); };
+
+// 链式相接（A→B→C 同高，只共端点）：不构成避让组，两条都平直
+let g = gidx([
+  { id: 'a', y: 100, x1: 300, x2: 100 },
+  { id: 'b', y: 100, x1: 500, x2: 300 }
+]);
+assert('链式相接不成组（修复回归）', g[0] === 0 && g[1] === 0);
+
+// 同跨度反向：真实重叠，同组错开
+g = gidx([
+  { id: 'a', y: 100, x1: 300, x2: 100 },
+  { id: 'b', y: 100, x1: 100, x2: 300 }
+]);
+assert('同跨度反向同组', g[0] === 0 && g[1] === 1);
+
+// 一段包含另一段：同组
+g = gidx([
+  { id: 'a', y: 100, x1: 100, x2: 300 },
+  { id: 'b', y: 100, x1: 100, x2: 500 }
+]);
+assert('包含跨度同组', g[0] === 0 && g[1] === 1);
+
+// 完全不相交：各自成组
+g = gidx([
+  { id: 'a', y: 100, x1: 100, x2: 300 },
+  { id: 'b', y: 100, x1: 400, x2: 600 }
+]);
+assert('不相交各自成组', g[0] === 0 && g[1] === 0);
+
+// 链 + 重叠混合：前两条重叠成组，第三条只与第二链条相接 → 独立
+g = gidx([
+  { id: 'a', y: 100, x1: 100, x2: 300 },
+  { id: 'b', y: 100, x1: 250, x2: 500 },
+  { id: 'c', y: 100, x1: 500, x2: 700 }
+]);
+assert('重叠组与链式相接边界', g[0] === 0 && g[1] === 1 && g[2] === 0);
+
+// 不同时间高度互不影响
+g = gidx([
+  { id: 'a', y: 100, x1: 100, x2: 300 },
+  { id: 'b', y: 200, x1: 150, x2: 250 }
+]);
+assert('不同高度互不影响', g[0] === 0 && g[1] === 0);
+
+// 三条同高全重叠：0/1/2 交替错开
+g = gidx([
+  { id: 'a', y: 100, x1: 100, x2: 500 },
+  { id: 'b', y: 100, x1: 100, x2: 500 },
+  { id: 'c', y: 100, x1: 100, x2: 500 }
+]);
+assert('三条全重叠 0/1/2', g[0] === 0 && g[1] === 1 && g[2] === 2);
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

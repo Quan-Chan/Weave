@@ -1768,6 +1768,42 @@ async function dragMouse(page, from, to, steps = 8) {
     t.ok('时序图模式：Alt+拖拽显示分区创建预览', preview.shown === true && preview.seqMode === 'sequence', preview);
     t.ok('时序图模式：松手后分区创建成功', region.count === 1, region);
     t.ok('时序图模式：框内节点自动归属分区', region.members.includes('s1') && !region.members.includes('s2'), region);
+    // ══ 15) 链式同高消息不触发避让（A→B→C 只共端点，两条都平直） ══
+    await page.evaluate(() => {
+      const mk = (id, label, x) => ({ id, label, desc: '', color: 'blue', x, y: 0, mirrored: false, w: 180, h: 80, life: 400 });
+      App.canvasState.nodes = [mk('s1', 'A', 0, 400), mk('s2', 'B', 600, 400), mk('s3', 'C', 1200, 400)];
+      App.canvasState.connections = [];
+      App._nodeZOrder = ['s1', 's2', 's3'];
+      App.saveCanvasSnapshot();
+      App.renderCanvas({ center: false });
+      App._createSeqMessage('s2', 's1', 200);
+      App._createSeqMessage('s3', 's2', 200);
+    });
+    await sleep(300);
+    const chain = await page.evaluate(() => {
+      const offs = App._buildConnOffsetMap();
+      return { m1: offs.get(App.canvasState.connections[0].id), m2: offs.get(App.canvasState.connections[1].id) };
+    });
+    t.ok('链式同高消息两条都平直（不误判避让）', chain.m1 === 0 && chain.m2 === 0, chain);
+    // ══ 16) 同轴时序线的落点按跨度判定（垂直排列的参与者不再连错） ══
+    await page.evaluate(() => {
+      const mk = (id, label, x, y) => ({ id, label, desc: '', color: 'blue', x, y, mirrored: false, w: 180, h: 80, life: 400 });
+      App.canvasState.nodes = [mk('s1', 'A', 0, 0), mk('s2', 'B', 0, 300), mk('s3', 'C', 600, 0)];
+      App.canvasState.connections = [];
+      App._nodeZOrder = ['s1', 's2', 's3'];
+      App.saveCanvasSnapshot();
+      App.renderCanvas({ center: false });
+    });
+    await sleep(300);
+    await page.evaluate(() => {
+      const hit = (x, y) => { const t = App._findSeqLifeHit(x, y, null); return t ? t.nodeId : null; };
+      window.__hits = { a: hit(90, 200), b: hit(90, 600), overlap: hit(90, 420), self: hit(690, 200) };
+    });
+    const hits = await page.evaluate(() => window.__hits);
+    t.ok('落点在 A 跨度内 → 命中 A（不串到同轴的 B）', hits.a === 's1', hits);
+    t.ok('落点在 B 跨度内（A 跨度外）→ 命中 B', hits.b === 's2', hits);
+    t.ok('跨度重叠区按锚点就近 → 命中 B（锚点 380 近于 80）', hits.overlap === 's2', hits);
+    t.ok('C 自身时序线照常命中', hits.self === 's3', hits);
   } finally {
     await cleanup();
   }
