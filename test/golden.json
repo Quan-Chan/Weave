@@ -914,12 +914,12 @@
     {
       "name": "_setRegionMode",
       "kind": "method",
-      "norm": "on){if(on&&this._isSeqMode())return;this._regionModeActive=on;conststage=this._getEl('canvasStage');if(stage)stage.classList.toggle('region-mode',on);constbtn=this._getEl('btnRegion');if(btn)btn.classList.toggle('active',on);}"
+      "norm": "on){if(on&&this._alignModeActive)this._setAlignMode(false);this._regionModeActive=on;conststage=this._getEl('canvasStage');if(stage)stage.classList.toggle('region-mode',on);constbtn=this._getEl('btnRegion');if(btn)btn.classList.toggle('active',on);}"
     },
     {
       "name": "_setAlignMode",
       "kind": "method",
-      "norm": "on){if(on&&!this._isSeqMode())return;this._alignModeActive=on;conststage=this._getEl('canvasStage');if(stage)stage.classList.toggle('align-mode',on);constbtn=this._getEl('btnAlignNodes');if(btn)btn.classList.toggle('active',on);if(!on){this.alignDragState=null;this._clearAlignPreview();}}"
+      "norm": "on){if(on&&!this._isSeqMode())return;if(on&&this._regionModeActive)this._setRegionMode(false);this._alignModeActive=on;conststage=this._getEl('canvasStage');if(stage)stage.classList.toggle('align-mode',on);constbtn=this._getEl('btnAlignNodes');if(btn)btn.classList.toggle('active',on);if(!on){this.alignDragState=null;this._clearAlignPreview();}}"
     },
     {
       "name": "_alignTargets",
@@ -999,7 +999,7 @@
     {
       "name": "_applyModeChrome",
       "kind": "method",
-      "norm": "){constseq=this._isSeqMode();conststage=this._getEl('canvasStage');if(stage)stage.classList.toggle('seq-mode',seq);constregionBtn=this._getEl('btnRegion');if(regionBtn)regionBtn.classList.toggle('mode-hidden',seq);constalignBtn=this._getEl('btnAlignNodes');if(alignBtn)alignBtn.classList.toggle('mode-hidden',!seq);this._updateModeToggle();this._applySettingsModeFilter();}"
+      "norm": "){constseq=this._isSeqMode();conststage=this._getEl('canvasStage');if(stage)stage.classList.toggle('seq-mode',seq);constalignBtn=this._getEl('btnAlignNodes');if(alignBtn)alignBtn.classList.toggle('mode-hidden',!seq);this._updateModeToggle();this._applySettingsModeFilter();}"
     },
     {
       "name": "_updateModeToggle",
@@ -1614,7 +1614,7 @@
     {
       "name": "onCanvasMouseDown",
       "kind": "method",
-      "norm": "e){constcontainer=this._getEl('canvasStage');if(e.button===0&&this._alignModeActive){this._clearHighlight();e.preventDefault();this._startAlignDrag(e);return;}if(e.button===0&&!this._isSeqMode()&&(this._regionModeActive||e.altKey)){this._clearHighlight();e.preventDefault();constwp=this.getWorldPos(e.clientX,e.clientY);consthitRegion=this._regionAtPoint(wp.x,wp.y);if(hitRegion){this.startRegionMove(e,hitRegion);return;}if(this.canvasBoxState){this.finalizeBoxSelect();return;}if(this.regionDragState){this.finalizeRegionCreate();return;}constrect=container.getBoundingClientRect();this.regionDragState={startWorldX:wp.x,startWorldY:wp.y,curWorldX:wp.x,curWorldY:wp.y,rect};this._applyRegionPreviewColor();this._getEl('regionPreview').style.display='block';this._updateRegionPreview(wp.x,wp.y);return;}if(e.button===0&&e.shiftKey){this._clearHighlight();e.preventDefault();if(this.canvasBoxState){this.finalizeBoxSelect();return;}constwp=this.getWorldPos(e.clientX,e.clientY);constrect=container.getBoundingClientRect();this.canvasBoxState={startX:wp.x,startY:wp.y,curX:wp.x,curY:wp.y,rect};this._getEl('boxSelectOverlay').style.display='block';}elseif(e.button===0||e.button===1){if(e.button===1)e.preventDefault();if(e.button===0&&!this._multiSelectMode)this._clearConnSelection();this._refreshContainerCache();this.canvasPanState={startX:e.clientX,startY:e.clientY,origPanX:this.panX,origPanY:this.panY};container.classList.add('grabbing');}}"
+      "norm": "e){constcontainer=this._getEl('canvasStage');if(e.button===0&&this._alignModeActive){this._clearHighlight();e.preventDefault();this._startAlignDrag(e);return;}if(e.button===0&&(this._regionModeActive||e.altKey)){this._clearHighlight();e.preventDefault();constwp=this.getWorldPos(e.clientX,e.clientY);consthitRegion=this._regionAtPoint(wp.x,wp.y);if(hitRegion){this.startRegionMove(e,hitRegion);return;}if(this.canvasBoxState){this.finalizeBoxSelect();return;}if(this.regionDragState){this.finalizeRegionCreate();return;}constrect=container.getBoundingClientRect();this.regionDragState={startWorldX:wp.x,startWorldY:wp.y,curWorldX:wp.x,curWorldY:wp.y,rect};this._applyRegionPreviewColor();this._getEl('regionPreview').style.display='block';this._updateRegionPreview(wp.x,wp.y);return;}if(e.button===0&&e.shiftKey){this._clearHighlight();e.preventDefault();if(this.canvasBoxState){this.finalizeBoxSelect();return;}constwp=this.getWorldPos(e.clientX,e.clientY);constrect=container.getBoundingClientRect();this.canvasBoxState={startX:wp.x,startY:wp.y,curX:wp.x,curY:wp.y,rect};this._getEl('boxSelectOverlay').style.display='block';}elseif(e.button===0||e.button===1){if(e.button===1)e.preventDefault();if(e.button===0&&!this._multiSelectMode)this._clearConnSelection();this._refreshContainerCache();this.canvasPanState={startX:e.clientX,startY:e.clientY,origPanX:this.panX,origPanY:this.panY};container.classList.add('grabbing');}}"
     },
     {
       "name": "_applyRegionPreviewColor",

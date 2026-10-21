@@ -938,7 +938,7 @@ body.touch #ctx{min-width:150px}
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v2.0.1</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v2.0.2</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -2825,9 +2825,9 @@ Object.assign(App, {
     return changed;
   },
   //切换分区创建模式（Region 键）。开启时画布加 region-mode 类供 CSS 提示。
-  //画框分区是节点图专有：时序图模式下拒绝开启（Region 键与 Alt+拖拽同此一门）。
+  //与高度对齐工具互斥：两者都要占用"画布空白处拖拽"，同时开启会互相抢事件。
   _setRegionMode(on) {
-    if (on && this._isSeqMode()) return;
+    if (on && this._alignModeActive) this._setAlignMode(false);
     this._regionModeActive = on;
     const stage = this._getEl('canvasStage');
     if (stage) stage.classList.toggle('region-mode', on);
@@ -2844,6 +2844,8 @@ Object.assign(App, {
      隐藏，键位路径同此一门）。*/
   _setAlignMode(on) {
     if (on && !this._isSeqMode()) return;
+    //与画框分区互斥：两者都要占用"画布空白处拖拽"，同时开启会互相抢事件。
+    if (on && this._regionModeActive) this._setRegionMode(false);
     this._alignModeActive = on;
     const stage = this._getEl('canvasStage');
     if (stage) stage.classList.toggle('align-mode', on);
@@ -3130,9 +3132,6 @@ Object.assign(App, {
     const seq = this._isSeqMode();
     const stage = this._getEl('canvasStage');
     if (stage) stage.classList.toggle('seq-mode', seq);
-    //画框分区是节点图专有：时序模式下不提供入口。
-    const regionBtn = this._getEl('btnRegion');
-    if (regionBtn) regionBtn.classList.toggle('mode-hidden', seq);
     //高度对齐是时序图专有：节点图模式下不提供入口。
     const alignBtn = this._getEl('btnAlignNodes');
     if (alignBtn) alignBtn.classList.toggle('mode-hidden', !seq);
@@ -6206,8 +6205,8 @@ Object.assign(App, {
       return;
     }
     //分区创建：Region 模式 / Alt+左键。命中到已有分区时不进入创建（转移动）。
-    //时序图模式无分区，此路整体不成立（Alt+空白退化为平移）。
-    if (e.button === 0 && !this._isSeqMode() && (this._regionModeActive || e.altKey)) {
+    //未开分区模式时 Alt+空白退化为平移；节点图与时序图同规则。
+    if (e.button === 0 && (this._regionModeActive || e.altKey)) {
       //画分区（含 Alt+空白按下）是画布操作：取消关联高亮。
       this._clearHighlight();
       e.preventDefault();

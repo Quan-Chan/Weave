@@ -147,7 +147,7 @@ async function dragMouse(page, from, to, steps = 8) {
     t.ok('按钮标签改为时序图', s1.label === '时序图', s1);
     t.ok('时序图模式下按钮仍不常亮', s1.active === false && s1.modeSeq === true, s1);
     t.ok('图标随模式切换（时序图图标显示）', flashOff.seqIcon === 'block' && flashOff.graphIcon === 'none', flashOff);
-    t.ok('时序图模式下隐藏画框分区入口', s1.regionHidden === true, s1);
+    t.ok('时序图模式下画框分区入口照常显示', s1.regionHidden === false, s1);
     t.ok('切换即时落盘上一模式（flow_data 已写入）', s1.graphStored === true, s1);
     t.ok('当前模式被记住（flow_mode=sequence）', s1.modeStored === 'sequence', s1);
 
@@ -331,7 +331,7 @@ async function dragMouse(page, from, to, steps = 8) {
     });
     t.ok('刷新后回到上次使用的模式', after.mode === 'sequence', after);
     t.ok('刷新后画布仍带 seq-mode 类（骨架重建后补上）', after.seqClass === true, after);
-    t.ok('刷新后仍隐藏画框分区入口', after.regionHidden === true, after);
+    t.ok('刷新后分区入口照常显示', after.regionHidden === false, after);
     const sockAfter = await page.evaluate(() => {
       const el = App._nodeElMap.get('s1');
       const nr = el.getBoundingClientRect();
@@ -1739,6 +1739,35 @@ async function dragMouse(page, from, to, steps = 8) {
       dragging.conns === 1 && dragging.dash === '7 5' && dragging.stroke === 'rgb(220, 38, 38)', dragging);
     t.ok('预览时目标端箭头同色（红线上不会挂一个蓝箭头）',
       dragging.arrowFill === '#dc2626', dragging);
+    // ══ 14) 分区创建在时序图模式可用（Alt+拖拽：预览 + 成员归属） ══
+    await page.evaluate(SETUP_SEQ);
+    await sleep(250);
+    const r1 = await page.evaluate(() => {
+      const r = App._nodeElMap.get('s1').getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    });
+    const ra = { x: r1.left - 40, y: r1.top - 40 };
+    const rb = { x: r1.right + 40, y: r1.bottom + 60 };
+    await page.keyboard.down('Alt');
+    await page.mouse.move(ra.x, ra.y);
+    await page.mouse.down();
+    await page.mouse.move((ra.x + rb.x) / 2, (ra.y + rb.y) / 2, { steps: 4 });
+    await sleep(80);
+    const preview = await page.evaluate(() => {
+      const ov = document.getElementById('regionPreview');
+      return { shown: !!ov && ov.style.display === 'block', seqMode: App._mode };
+    });
+    await page.mouse.move(rb.x, rb.y, { steps: 4 });
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+    await sleep(400);
+    const region = await page.evaluate(() => {
+      const r = App.canvasState.regions[0];
+      return { count: App.canvasState.regions.length, members: r ? r.nodeIds : [] };
+    });
+    t.ok('时序图模式：Alt+拖拽显示分区创建预览', preview.shown === true && preview.seqMode === 'sequence', preview);
+    t.ok('时序图模式：松手后分区创建成功', region.count === 1, region);
+    t.ok('时序图模式：框内节点自动归属分区', region.members.includes('s1') && !region.members.includes('s2'), region);
   } finally {
     await cleanup();
   }
