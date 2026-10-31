@@ -938,7 +938,7 @@ body.touch #ctx{min-width:150px}
           <div class="about-content">
             <div class="about-icon" id="aboutSigma" role="button" tabindex="0" data-i18n-title="about.sigmaTip" title="千万不要点"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M 16.69 5.44 L 7.31 5.44 L 12 12 L 7.31 18.56 L 16.69 18.56"/></svg></div>
             <div class="about-row"><label data-i18n="about.appName">软件名称</label><span>Weave</span></div>
-            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v2.0.3</span></div>
+            <div class="about-row"><label data-i18n="about.version">版本号</label><span>v2.0.4</span></div>
             <div class="about-row"><label data-i18n="about.projectUrl">项目地址</label><a href="https://github.com/Quan-Chan/Weave" target="_blank">https://github.com/Quan-Chan/Weave</a></div>
             <div class="about-row"><label data-i18n="about.devHome">开发者主页</label><a href="https://github.com/Quan-Chan" target="_blank">https://github.com/Quan-Chan</a></div>
           </div>
@@ -1338,7 +1338,6 @@ const I18N = {
     'misc.color.blue': '蓝色', 'misc.color.cyan': '青色', 'misc.color.green': '绿色',
     'misc.color.yellow': '黄色', 'misc.color.orange': '橙色',
     'misc.untitled': '未命名', 'misc.dblClickEdit': '双击编辑',
-    'misc.copySuffix': '{label} 副本',
     // 确认框
     'confirm.clearAll': '将清空页面节点信息，是否继续？',
     // Σ 彩蛋（startEasterEgg）
@@ -1458,7 +1457,6 @@ const I18N = {
     'misc.color.blue': 'Blue', 'misc.color.cyan': 'Cyan', 'misc.color.green': 'Green',
     'misc.color.yellow': 'Yellow', 'misc.color.orange': 'Orange',
     'misc.untitled': 'Untitled', 'misc.dblClickEdit': 'Double-click to edit',
-    'misc.copySuffix': '{label} copy',
     'confirm.clearAll': 'This will clear all nodes, connections and regions. Continue?',
     'egg.hint': 'Click me', 'egg.toast': 'Σ spit out a node!', 'egg.desc': 'A node spat out by Σ'
   }
@@ -8550,9 +8548,10 @@ Object.assign(App, {
     this._setRegionMode(!this._regionModeActive);
     this.showToast(this.t(this._regionModeActive ? 'toast.regionModeOn' : 'toast.regionModeOff'), 'info');
   },
+  //克隆节点：新 id，节点名与原节点完全相同。
   _cloneNode(src, offsetX, offsetY) {
     const id = this._genId();
-    const c = { id, label: this.t('misc.copySuffix', { label: src.label || this.t('misc.untitled') }), desc: src.desc, color: src.color,
+    const c = { id, label: src.label, desc: src.desc, color: src.color,
       x: (src.x || 0) + (offsetX || 30), y: (src.y || 0) + (offsetY || 30),
       mirrored: !!src.mirrored };
     const size = Weave.Geom.getNodeSize(src); c.w = size.w; c.h = size.h;
@@ -8561,7 +8560,7 @@ Object.assign(App, {
     if (src.lifeColor) c.lifeColor = src.lifeColor;
     this.canvasState.nodes.push(c);
     this._nodeZOrder.push(id);
-    //克隆节点落位后同步分区归属（粘贴副本落入分区 → 加入该分区 nodeIds）。
+    //克隆节点落位后同步分区归属（新节点落入分区 → 加入该分区 nodeIds）。
     this._syncNodeRegionMembership(id);
     return id;
   },
