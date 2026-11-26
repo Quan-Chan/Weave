@@ -56,8 +56,6 @@ docs/ 之外的相关文档：
   - 「修复」只记**已发布版本**中既有功能的缺陷。
   - 不写内部实现标识（模块号、`App` 方法名、常量名）；需要指代时用用户在界面上看得到的名称（按钮、菜单项）。
 
-发布流程说明只在私有开发库维护（docs/release-workflow.md），描述两库的对应关系、同步时排除的路径与版本发布步骤；公开发布库不含该文件。
-
 引用关系：development-workflow.md 引用本文件作为代码结构规则的全文来源；application-form.md 引用 test/README.md 与 development-workflow.md 作为结构与流程的延伸说明。本文档为开发规则的总入口。
 
 ## 功能概览
